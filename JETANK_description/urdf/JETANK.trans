@@ -1,0 +1,125 @@
+<?xml version="1.0" ?>
+<robot name="JETANK" xmlns:xacro="http://www.ros.org/wiki/xacro" >
+
+<transmission name="revolute_BEARING_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_BEARING">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_BEARING_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="revolute_FREE_WHEEL_LEFT_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_FREE_WHEEL_LEFT">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_FREE_WHEEL_LEFT_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="revolute_FREE_WHEEL_RIGHT_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_FREE_WHEEL_RIGHT">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_FREE_WHEEL_RIGHT_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="revolute_GRIPPER_L1_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_GRIPPER_L1">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_GRIPPER_L1_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="revolute_GRIPPER_L2_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_GRIPPER_L2">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_GRIPPER_L2_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_SERVO_UPPER_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_SERVO_UPPER">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_SERVO_UPPER_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_SERVO_LOWER_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_SERVO_LOWER">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_SERVO_LOWER_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_DRIVING_WHEEL_R_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_DRIVING_WHEEL_R">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_DRIVING_WHEEL_R_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_DRIVING_WHEEL_L_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_DRIVING_WHEEL_L">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_DRIVING_WHEEL_L_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_GRIPPER_R2_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_GRIPPER_R2">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_GRIPPER_R2_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+<transmission name="Revolute_GRIPPER_R1_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="Revolute_GRIPPER_R1">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="Revolute_GRIPPER_R1_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
+</robot>

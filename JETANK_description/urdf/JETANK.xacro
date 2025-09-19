@@ -1,0 +1,590 @@
+<?xml version="1.0" ?>
+<robot name="JETANK" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find JETANK_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find JETANK_description)/urdf/JETANK.trans" />
+<xacro:include filename="$(find JETANK_description)/urdf/JETANK.gazebo" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="-0.004435000283629018 -0.010243918252694353 -0.02819811925527743" rpy="0 0 0"/>
+    <mass value="0.7639308708503839"/>
+    <inertia ixx="0.001502" iyy="0.003532" izz="0.003808" ixy="9e-06" iyz="4e-06" ixz="5.1e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ANTENNA_L_1">
+  <inertial>
+    <origin xyz="-0.00010440589830879032 -0.028760958470267856 0.051254628121503915" rpy="0 0 0"/>
+    <mass value="0.1712590340150529"/>
+    <inertia ixx="0.000314" iyy="0.000306" izz="1.1e-05" ixy="-0.0" iyz="2.1e-05" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.070085 0.055118 0.007934" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.070085 0.055118 0.007934" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="BEARING_1">
+  <inertial>
+    <origin xyz="1.0562222860222015e-07 -5.036325476879752e-06 0.002529664311033245" rpy="0 0 0"/>
+    <mass value="0.05589211207057761"/>
+    <inertia ixx="9e-06" iyy="9e-06" izz="1.7e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.046079 0.010536 -0.01116" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.046079 0.010536 -0.01116" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ARM_LOWER_1">
+  <inertial>
+    <origin xyz="-0.01064714156754467 -5.4423566282478866e-05 0.029441657866703955" rpy="0 0 0"/>
+    <mass value="0.1036438493797283"/>
+    <inertia ixx="8.8e-05" iyy="8e-05" izz="7.2e-05" ixy="0.0" iyz="0.0" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.046079 0.010553 -0.01919" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.046079 0.010553 -0.01919" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="FREE_WHEEL_L_1">
+  <inertial>
+    <origin xyz="-4.9004259322832366e-05 -0.013527120076589946 -2.851984933825019e-05" rpy="0 0 0"/>
+    <mass value="0.11488889485414525"/>
+    <inertia ixx="4.1e-05" iyy="4e-05" izz="4.1e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.05431 0.054968 0.052234" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.05431 0.054968 0.052234" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="FREE_WHEEL_R_1">
+  <inertial>
+    <origin xyz="4.918568823523983e-05 0.013527127364721205 2.805371253861849e-05" rpy="0 0 0"/>
+    <mass value="0.11488889485415188"/>
+    <inertia ixx="4.1e-05" iyy="4e-05" izz="4.1e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.063868 -0.033862 0.052048" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.063868 -0.033862 0.052048" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="CAMERA_1">
+  <inertial>
+    <origin xyz="-0.005466883295410632 5.162118534754456e-06 -0.0028148521817242395" rpy="0 0 0"/>
+    <mass value="0.01917709742595803"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.104728 0.010412 -0.053571" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.104728 0.010412 -0.053571" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="CAM_HOLDER_1">
+  <inertial>
+    <origin xyz="-0.02230975954219795 8.145119958027913e-05 1.5298627945650733e-06" rpy="0 0 0"/>
+    <mass value="0.04320508566431304"/>
+    <inertia ixx="2.6e-05" iyy="1.2e-05" izz="3.2e-05" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.070879 0.010535 -0.053571" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.070879 0.010535 -0.053571" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_L1_1">
+  <inertial>
+    <origin xyz="-0.01499953892313019 4.862891752669459e-05 0.0029999309597343315" rpy="0 0 0"/>
+    <mass value="0.0062442558314246485"/>
+    <inertia ixx="0.0" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.174488 0.004873 -0.179831" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.174488 0.004873 -0.179831" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_L2_1">
+  <inertial>
+    <origin xyz="-0.0024363716844204852 0.003974526639710773 0.003008312151974085" rpy="0 0 0"/>
+    <mass value="0.02146027585992414"/>
+    <inertia ixx="0.0" iyy="6e-06" izz="6e-06" ixy="-1e-06" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.204487 0.004763 -0.179731" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.204487 0.004763 -0.179731" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="SERVO_UPPER_1">
+  <inertial>
+    <origin xyz="-0.009299858054830558 0.0009018947829658331 1.9142733671539958e-06" rpy="0 0 0"/>
+    <mass value="0.2098216132647202"/>
+    <inertia ixx="3.7e-05" iyy="3.5e-05" izz="5.8e-05" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.059673 0.009093 -0.181342" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.059673 0.009093 -0.181342" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ARM_MIDDLE_2">
+  <inertial>
+    <origin xyz="9.48262388403287e-08 -9.963954604889219e-05 0.04750023738359482" rpy="0 0 0"/>
+    <mass value="0.06186397464920469"/>
+    <inertia ixx="9.6e-05" iyy="6.8e-05" izz="3.4e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.059673 0.008894 -0.086342" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.059673 0.008894 -0.086342" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="SERVO_LOWER_1">
+  <inertial>
+    <origin xyz="-0.01778064329454669 -0.01751744641612735 -3.676811534183977e-05" rpy="0 0 0"/>
+    <mass value="0.20982161326471968"/>
+    <inertia ixx="3.7e-05" iyy="3.5e-05" izz="5.8e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.032586 -0.009458 -0.086381" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.032586 -0.009458 -0.086381" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DRIVER_WHEEL_R_2">
+  <inertial>
+    <origin xyz="6.935655254387829e-05 0.019022053226744773 2.9509046361002322e-05" rpy="0 0 0"/>
+    <mass value="0.1049698213829899"/>
+    <inertia ixx="2.3e-05" iyy="2.5e-05" izz="2.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.054631 -0.033431 0.052049" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.054631 -0.033431 0.052049" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DRIVER_WHEEL_L_1">
+  <inertial>
+    <origin xyz="-6.918869203477451e-05 -0.01902200130388708 -5.0233203182634134e-05" rpy="0 0 0"/>
+    <mass value="0.10496982138298995"/>
+    <inertia ixx="2.3e-05" iyy="2.5e-05" izz="2.3e-05" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.064189 0.054537 0.052234" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.064189 0.054537 0.052234" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_R2_1">
+  <inertial>
+    <origin xyz="-0.0024645590426079222 -0.003969188400402515 0.002991675751564754" rpy="0 0 0"/>
+    <mass value="0.021460275859939086"/>
+    <inertia ixx="1e-06" iyy="6e-06" izz="6e-06" ixy="1e-06" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.204524 0.014764 -0.17981" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.204524 0.014764 -0.17981" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_R1_1">
+  <inertial>
+    <origin xyz="-0.014999865534495699 4.7716893300363966e-05 0.002999957523558139" rpy="0 0 0"/>
+    <mass value="0.006244255831424672"/>
+    <inertia ixx="0.0" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.174524 0.014872 -0.17981" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.174524 0.014872 -0.17981" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_BASE_1">
+  <inertial>
+    <origin xyz="-0.020109788867281597 0.007659580658851287 1.6272994072724645e-05" rpy="0 0 0"/>
+    <mass value="0.03665503665870981"/>
+    <inertia ixx="1.1e-05" iyy="7e-06" izz="1.8e-05" ixy="1e-06" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130006 0.010025 -0.18132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130006 0.010025 -0.18132" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="GRIPPER_CENTER_LINK">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.001"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" iyz="0" ixz="0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.01 0.01 0.01"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.01 0.01 0.01"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ARM_UPPER_1">
+  <inertial>
+    <origin xyz="-0.02165050511784486 0.019299608691663982 -0.00747987474304726" rpy="0 0 0"/>
+    <mass value="0.03565761396104929"/>
+    <inertia ixx="1.4e-05" iyy="1.4e-05" izz="2.5e-05" ixy="1e-06" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.08725 0.030359 -0.188797" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.08725 0.030359 -0.188797" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ANTENNA_R_2">
+  <inertial>
+    <origin xyz="0.00010389848904659993 0.02854581227192822 0.05137522349342476" rpy="0 0 0"/>
+    <mass value="0.17125903401505282"/>
+    <inertia ixx="0.000314" iyy="0.000307" izz="1.1e-05" ixy="-0.0" iyz="-2e-05" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.070406 -0.033281 0.007749" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.070406 -0.033281 0.007749" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="rigid_ANTENNA_L_BASE_JOINT" type="fixed">
+  <origin xyz="0.070085 -0.055118 -0.007934" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="ANTENNA_L_1"/>
+</joint>
+
+<joint name="rigid_BEARING_BASE_JOINT" type="fixed">
+  <origin xyz="-0.046079 -0.010536 0.01116" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="BEARING_1"/>
+</joint>
+
+<joint name="revolute_BEARING" type="revolute">
+  <origin xyz="0.0 -1.7e-05 0.00803" rpy="0 0 0"/>
+  <parent link="BEARING_1"/>
+  <child link="ARM_LOWER_1"/>
+  <axis xyz="-4e-06 -0.002097 0.999998"/>
+  <limit upper="1.5708" lower="-1.5708" effort="100" velocity="100"/>
+</joint>
+
+<joint name="revolute_FREE_WHEEL_LEFT" type="revolute">
+  <origin xyz="0.05431 -0.054968 -0.052234" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="FREE_WHEEL_L_1"/>
+  <axis xyz="0.003633 0.999991 0.002097"/>
+  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="revolute_FREE_WHEEL_RIGHT" type="revolute">
+  <origin xyz="-0.063868 0.033862 -0.052048" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="FREE_WHEEL_R_1"/>
+  <axis xyz="-0.003633 -0.999991 -0.002097"/>
+  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="rigid_CAMERA_CAMERA_HOLDER" type="fixed">
+  <origin xyz="-0.033849 0.000123 0.0" rpy="0 0 0"/>
+  <parent link="CAM_HOLDER_1"/>
+  <child link="CAMERA_1"/>
+</joint>
+
+<joint name="rigid_CAMERA_HOLDER_ARM_LOWER" type="fixed">
+  <origin xyz="-0.0248 1.8e-05 0.034381" rpy="0 0 0"/>
+  <parent link="ARM_LOWER_1"/>
+  <child link="CAM_HOLDER_1"/>
+</joint>
+
+<joint name="revolute_GRIPPER_L1" type="revolute">
+  <origin xyz="-0.044482 0.005152 -0.001489" rpy="0 0 0"/>
+  <parent link="GRIPPER_BASE_1"/>
+  <child link="GRIPPER_L1_1"/>
+  <axis xyz="-5e-06 -0.002097 0.999998"/>
+  <limit upper="0.0" lower="-0.785398" effort="100" velocity="100"/>
+</joint>
+
+<joint name="revolute_GRIPPER_L2" type="revolute">
+  <origin xyz="-0.029999 0.00011 -0.0001" rpy="0 0 0"/>
+  <parent link="GRIPPER_L1_1"/>
+  <child link="GRIPPER_L2_1"/>
+  <axis xyz="5e-06 0.002097 -0.999998"/>
+  <limit upper="0.0" lower="-0.785398" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Revolute_SERVO_UPPER" type="revolute">
+  <origin xyz="0.0 -0.000199 0.095" rpy="0 0 0"/>
+  <parent link="ARM_MIDDLE_2"/>
+  <child link="SERVO_UPPER_1"/>
+  <axis xyz="-0.003633 -0.999991 -0.002097"/>
+  <limit upper="0.785594" lower="-3.1418" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Revolute_SERVO_LOWER" type="revolute">
+  <origin xyz="-0.027087 -0.018352 -3.9e-05" rpy="0 0 0"/>
+  <parent link="SERVO_LOWER_1"/>
+  <child link="ARM_MIDDLE_2"/>
+  <axis xyz="-0.003633 -0.999991 -0.002097"/>
+  <limit upper="1.570796" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Rigid_SERVO_LOWER_ARM_LOWER" type="fixed">
+  <origin xyz="0.013493 0.020011 0.067191" rpy="0 0 0"/>
+  <parent link="ARM_LOWER_1"/>
+  <child link="SERVO_LOWER_1"/>
+</joint>
+
+<joint name="Revolute_DRIVING_WHEEL_R" type="revolute">
+  <origin xyz="0.054631 0.033431 -0.052049" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DRIVER_WHEEL_R_2"/>
+  <axis xyz="-0.003633 -0.999991 -0.002097"/>
+  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Revolute_DRIVING_WHEEL_L" type="revolute">
+  <origin xyz="-0.064189 -0.054537 -0.052234" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DRIVER_WHEEL_L_1"/>
+  <axis xyz="0.003633 0.999991 0.002097"/>
+  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Revolute_GRIPPER_R2" type="revolute">
+  <origin xyz="-0.03 0.000108 0.0" rpy="0 0 0"/>
+  <parent link="GRIPPER_R1_1"/>
+  <child link="GRIPPER_R2_1"/>
+  <axis xyz="-5e-06 -0.002097 0.999998"/>
+  <limit upper="0.0" lower="-0.785398" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Revolute_GRIPPER_R1" type="revolute">
+  <origin xyz="-0.044518 -0.004847 -0.00151" rpy="0 0 0"/>
+  <parent link="GRIPPER_BASE_1"/>
+  <child link="GRIPPER_R1_1"/>
+  <axis xyz="-5e-06 -0.002097 0.999998"/>
+  <limit upper="0.785398" lower="0.0" effort="100" velocity="100"/>
+</joint>
+
+<joint name="rigid_GRIPPER_BASE_ARM_UPPER" type="fixed">
+  <origin xyz="-0.042756 0.020334 -0.007477" rpy="0 0 0"/>
+  <parent link="ARM_UPPER_1"/>
+  <child link="GRIPPER_BASE_1"/>
+</joint>
+
+<joint name="GRIPPER_CENTER" type="fixed">
+  <origin xyz="-0.095065 0 0" rpy="0 0 0"/>
+  <parent link="GRIPPER_BASE_1"/>
+  <child link="GRIPPER_CENTER_LINK"/>
+</joint>
+
+<joint name="rigid_UPPER_ARM_SERVO_UPPER" type="fixed">
+  <origin xyz="-0.027577 -0.021266 0.007455" rpy="0 0 0"/>
+  <parent link="SERVO_UPPER_1"/>
+  <child link="ARM_UPPER_1"/>
+</joint>
+
+<joint name="rigid_ANTENNA_R_BASE_JOINT" type="fixed">
+  <origin xyz="0.070406 0.033281 -0.007749" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="ANTENNA_R_2"/>
+</joint>
+
+</robot>
