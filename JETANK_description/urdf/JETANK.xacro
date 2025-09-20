@@ -570,7 +570,7 @@
 </joint>
 
 <joint name="GRIPPER_CENTER" type="fixed">
-  <origin xyz="-0.095065 0 0" rpy="0 0 0"/>
+  <origin xyz="-0.108750 0 0" rpy="0 0 0"/>
   <parent link="GRIPPER_BASE_1"/>
   <child link="GRIPPER_CENTER_LINK"/>
 </joint>
