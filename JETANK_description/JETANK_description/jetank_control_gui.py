@@ -3,6 +3,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -40,6 +42,9 @@ class JETANKGripperControlGUI(Node):
         
         # Create publisher for joint states
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
+        
+        # Create trajectory publisher
+        self.trajectory_pub = self.create_publisher(JointTrajectory, 'arm_trajectory', 10)
         
         # Initialize joint state message with all JETANK revolute joints
         self.joint_state = JointState()
@@ -79,6 +84,10 @@ class JETANKGripperControlGUI(Node):
         # Threading control
         self.gui_thread = None
         self.running = True
+        
+        # Trajectory control
+        self.trajectory_active = False
+        self.trajectory_thread = None
         
         # Create Tkinter GUI in a separate thread
         self.setup_gui_thread()
@@ -267,11 +276,23 @@ class JETANKGripperControlGUI(Node):
         self.z_entry.pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(z_frame, text="mm").pack(side=tk.LEFT, padx=(5, 0))
         
+        # Duration input
+        duration_frame = ttk.Frame(arm_control_frame)
+        duration_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(duration_frame, text="Duration (sec):").pack(side=tk.LEFT)
+        self.duration_var = tk.StringVar(value="3.0")
+        self.duration_entry = ttk.Entry(duration_frame, textvariable=self.duration_var, width=10)
+        self.duration_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
         # Move button
         button_frame = ttk.Frame(arm_control_frame)
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Move to Position", 
                   command=self.move_to_position).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Move with Trajectory", 
+                  command=self.move_with_trajectory).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Stop Trajectory", 
+                  command=self.stop_trajectory).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset Position", 
                   command=self.reset_arm_position).pack(side=tk.LEFT, padx=5)
         
@@ -288,7 +309,8 @@ class JETANKGripperControlGUI(Node):
         
         # Initialize with welcome message
         self.error_text.insert(tk.END, "Arm Control Ready\n")
-        self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position'\n")
+        self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position' for instant movement\n")
+        self.error_text.insert(tk.END, "Or click 'Move with Trajectory' for smooth timed movement\n")
         self.error_text.insert(tk.END, "Inverse Kinematics will calculate the required joint angles\n\n")
         self.error_text.insert(tk.END, "Workspace limits (approximate):\n")
         self.error_text.insert(tk.END, "  X: -200 to 200 mm\n")
@@ -482,6 +504,209 @@ class JETANKGripperControlGUI(Node):
         self.error_text.insert(tk.END, "Arm reset to home position\n")
         self.error_text.see(tk.END)
         self.update_status("Arm reset to home position")
+        
+    def move_with_trajectory(self):
+        """Move arm to specified x, y, z position using inverse kinematics with timed trajectory"""
+        try:
+            x = float(self.x_var.get())
+            y = float(self.y_var.get())
+            z = float(self.z_var.get())
+            duration = float(self.duration_var.get())
+            
+            # Check if IK functions are available
+            if compute_ik is None:
+                self.error_text.insert(tk.END, "Error: IK functions not available. Check ik.py import.\n")
+                self.error_text.see(tk.END)
+                self.update_status("Error: IK functions unavailable")
+                return
+            
+            # Check if trajectory is already active
+            if self.trajectory_active:
+                self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                self.error_text.see(tk.END)
+                self.update_status("Error: Trajectory in progress")
+                return
+            
+            self.error_text.insert(tk.END, f"Computing IK for trajectory: X={x}mm, Y={y}mm, Z={z}mm, Duration={duration}s\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Computing IK trajectory for ({x}, {y}, {z})")
+            
+            # Compute inverse kinematics
+            joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
+            
+            if joint_angles is not None:
+                # Extract joint angles
+                theta0 = joint_angles[0]  # revolute_BEARING
+                theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
+                theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
+                
+                # Get current joint positions
+                current_joints = [
+                    self.joint_state.position[self.arm_joint_indices['BEARING']],
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']],
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']]
+                ]
+                
+                # Target joint positions
+                target_joints = [theta0, theta1, theta3]
+                
+                # Start trajectory execution in separate thread
+                self.trajectory_active = True
+                self.trajectory_thread = threading.Thread(
+                    target=self.execute_trajectory, 
+                    args=(current_joints, target_joints, duration),
+                    daemon=True
+                )
+                self.trajectory_thread.start()
+                
+                self.error_text.insert(tk.END, f"Trajectory started:\n")
+                self.error_text.insert(tk.END, f"  From: [{current_joints[0]:.3f}, {current_joints[1]:.3f}, {current_joints[2]:.3f}]\n")
+                self.error_text.insert(tk.END, f"  To: [{theta0:.3f}, {theta1:.3f}, {theta3:.3f}]\n")
+                self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Executing trajectory to ({x}, {y}, {z})")
+                
+            else:
+                self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
+                self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
+                self.error_text.see(tk.END)
+                self.update_status("IK Failed: Position unreachable")
+            
+        except ValueError:
+            self.error_text.insert(tk.END, "Error: Please enter valid numeric values for coordinates and duration\n")
+            self.error_text.see(tk.END)
+            self.update_status("Error: Invalid input values")
+        except Exception as e:
+            self.error_text.insert(tk.END, f"Error: {str(e)}\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Error: {str(e)}")
+            
+    def execute_trajectory(self, start_joints, target_joints, duration):
+        """Execute smooth trajectory from start to target joint positions"""
+        try:
+            # Calculate number of steps (50 steps per second for smooth motion)
+            steps = max(10, int(duration * 50))
+            dt = duration / steps
+            
+            # Create trajectory points
+            trajectory_points = []
+            
+            for i in range(steps + 1):
+                # Calculate interpolation factor (0 to 1)
+                t = i / steps
+                
+                # Smooth interpolation using cubic easing
+                t_smooth = 3 * t**2 - 2 * t**3  # Smooth start and end
+                
+                # Interpolate joint positions
+                current_positions = []
+                for j in range(3):
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Create trajectory point
+                point = JointTrajectoryPoint()
+                point.positions = current_positions
+                point.time_from_start = Duration(sec=int(t * duration), nanosec=int(((t * duration) % 1) * 1e9))
+                
+                trajectory_points.append(point)
+            
+            # Create and publish trajectory
+            traj = JointTrajectory()
+            traj.joint_names = ['revolute_BEARING', 'Revolute_SERVO_LOWER', 'Revolute_SERVO_UPPER']
+            traj.points = trajectory_points
+            
+            # Publish trajectory
+            self.trajectory_pub.publish(traj)
+            
+            # Update GUI in real-time during trajectory execution
+            start_time = time.time()
+            while time.time() - start_time < duration and self.trajectory_active:
+                elapsed = time.time() - start_time
+                t = min(1.0, elapsed / duration)
+                t_smooth = 3 * t**2 - 2 * t**3
+                
+                # Calculate current positions
+                current_positions = []
+                for j in range(3):
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Update joint state
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                
+                # Update GUI sliders (thread-safe)
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_trajectory, current_positions)
+                
+                time.sleep(0.02)  # 50Hz update rate
+            
+            # Ensure final position is set
+            if self.trajectory_active:
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
+                
+                # Update GUI to final position
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_trajectory, target_joints)
+                
+                # Verify final position
+                T, actual_pos = forward_kinematics(target_joints[0], target_joints[1], target_joints[2])
+                if actual_pos is not None:
+                    pos_error = np.linalg.norm(np.array(actual_pos) - np.array([float(self.x_var.get()), float(self.y_var.get()), float(self.z_var.get())]))
+                    
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.trajectory_completed, pos_error)
+            
+        except Exception as e:
+            if hasattr(self, 'root') and self.root.winfo_exists():
+                self.root.after(0, self.trajectory_error, str(e))
+        finally:
+            self.trajectory_active = False
+            
+    def update_gui_during_trajectory(self, joint_positions):
+        """Update GUI sliders during trajectory execution (called from main thread)"""
+        try:
+            # Update sliders
+            self.bearing_var.set(joint_positions[0])
+            self.servo_lower_var.set(joint_positions[1])
+            self.servo_upper_var.set(joint_positions[2])
+            
+            # Update labels
+            self.bearing_label.config(text=f"{joint_positions[0]:.3f}")
+            self.servo_lower_label.config(text=f"{joint_positions[1]:.3f}")
+            self.servo_upper_label.config(text=f"{joint_positions[2]:.3f}")
+            
+        except Exception as e:
+            pass  # Ignore GUI update errors during trajectory
+            
+    def trajectory_completed(self, pos_error):
+        """Handle trajectory completion (called from main thread)"""
+        self.error_text.insert(tk.END, f"Trajectory completed successfully!\n")
+        self.error_text.insert(tk.END, f"Final position error: {pos_error:.2f} mm\n\n")
+        self.error_text.see(tk.END)
+        self.update_status(f"Trajectory completed - Error: {pos_error:.1f}mm")
+        
+    def trajectory_error(self, error_msg):
+        """Handle trajectory error (called from main thread)"""
+        self.error_text.insert(tk.END, f"Trajectory error: {error_msg}\n")
+        self.error_text.see(tk.END)
+        self.update_status(f"Trajectory error: {error_msg}")
+        
+    def stop_trajectory(self):
+        """Stop current trajectory execution"""
+        if self.trajectory_active:
+            self.trajectory_active = False
+            self.error_text.insert(tk.END, "Trajectory stopped by user\n")
+            self.error_text.see(tk.END)
+            self.update_status("Trajectory stopped")
+        else:
+            self.error_text.insert(tk.END, "No trajectory is currently running\n")
+            self.error_text.see(tk.END)
+            self.update_status("No active trajectory")
         
     def get_gripper_pose(self):
         """Get gripper pose using tf2_echo command"""
@@ -800,3 +1025,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
