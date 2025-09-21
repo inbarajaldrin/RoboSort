@@ -8,6 +8,31 @@ from tkinter import ttk
 import threading
 import time
 import subprocess
+import sys
+import os
+import numpy as np
+import math
+
+# Add scripts directory to path and import IK functions
+scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
+if scripts_path not in sys.path:
+    sys.path.insert(0, scripts_path)
+
+try:
+    from ik import compute_ik, forward_kinematics, verify_solution
+except ImportError as e:
+    # Try absolute path if relative path fails (for ros2 launch)
+    scripts_path_abs = '/home/ubuntu/new_ros2_ws/src/JETANK_description/scripts'
+    if scripts_path_abs not in sys.path:
+        sys.path.insert(0, scripts_path_abs)
+    try:
+        from ik import compute_ik, forward_kinematics, verify_solution
+    except ImportError as e2:
+        print(f"Warning: Could not import IK functions: {e2}")
+        print("IK functionality will be disabled.")
+        compute_ik = None
+        forward_kinematics = None
+        verify_solution = None
 
 class JETANKGripperControlGUI(Node):
     def __init__(self):
@@ -262,7 +287,13 @@ class JETANKGripperControlGUI(Node):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Initialize with welcome message
-        self.error_text.insert(tk.END, "Arm Control Ready\nEnter target coordinates and click 'Move to Position'\n")
+        self.error_text.insert(tk.END, "Arm Control Ready\n")
+        self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position'\n")
+        self.error_text.insert(tk.END, "Inverse Kinematics will calculate the required joint angles\n\n")
+        self.error_text.insert(tk.END, "Workspace limits (approximate):\n")
+        self.error_text.insert(tk.END, "  X: -200 to 200 mm\n")
+        self.error_text.insert(tk.END, "  Y: -200 to 200 mm\n")
+        self.error_text.insert(tk.END, "  Z: 50 to 250 mm\n\n")
         
     def create_gripper_control_tab(self):
         """Create the gripper control tab"""
@@ -347,21 +378,85 @@ class JETANKGripperControlGUI(Node):
         self.update_status(f"Upper Servo: {pos:.3f}")
         
     def move_to_position(self):
-        """Move arm to specified x, y, z position"""
+        """Move arm to specified x, y, z position using inverse kinematics"""
         try:
             x = float(self.x_var.get())
             y = float(self.y_var.get())
             z = float(self.z_var.get())
             
-            # TODO: Add inverse kinematics logic here
-            self.error_text.insert(tk.END, f"Moving to position: X={x}, Y={y}, Z={z}\n")
+            # Check if IK functions are available
+            if compute_ik is None:
+                self.error_text.insert(tk.END, "Error: IK functions not available. Check ik.py import.\n")
+                self.error_text.see(tk.END)
+                self.update_status("Error: IK functions unavailable")
+                return
+            
+            self.error_text.insert(tk.END, f"Computing IK for position: X={x}mm, Y={y}mm, Z={z}mm\n")
             self.error_text.see(tk.END)
-            self.update_status(f"Moving to ({x}, {y}, {z})")
+            self.update_status(f"Computing IK for ({x}, {y}, {z})")
+            
+            # Compute inverse kinematics
+            joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
+            
+            if joint_angles is not None:
+                # Extract joint angles
+                theta0 = joint_angles[0]  # revolute_BEARING
+                theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
+                theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
+                
+                # Update GUI sliders and joint positions
+                self.bearing_var.set(theta0)
+                self.servo_lower_var.set(theta1)
+                self.servo_upper_var.set(theta3)
+                
+                # Update joint state message
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = theta0
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = theta1
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = theta3
+                
+                # Update labels
+                self.bearing_label.config(text=f"{theta0:.3f}")
+                self.servo_lower_label.config(text=f"{theta1:.3f}")
+                self.servo_upper_label.config(text=f"{theta3:.3f}")
+                
+                # Verify the solution by computing forward kinematics
+                T, actual_pos = forward_kinematics(theta0, theta1, theta3)
+                if actual_pos is not None:
+                    pos_error = np.linalg.norm(np.array(actual_pos) - np.array([x, y, z]))
+                    
+                    self.error_text.insert(tk.END, f"IK Solution Found:\n")
+                    self.error_text.insert(tk.END, f"  Base Bearing: {theta0:.4f} rad ({math.degrees(theta0):.2f}°)\n")
+                    self.error_text.insert(tk.END, f"  Lower Servo: {theta1:.4f} rad ({math.degrees(theta1):.2f}°)\n")
+                    self.error_text.insert(tk.END, f"  Upper Servo: {theta3:.4f} rad ({math.degrees(theta3):.2f}°)\n")
+                    self.error_text.insert(tk.END, f"Target: [{x:.1f}, {y:.1f}, {z:.1f}] mm\n")
+                    self.error_text.insert(tk.END, f"Actual: [{actual_pos[0]:.1f}, {actual_pos[1]:.1f}, {actual_pos[2]:.1f}] mm\n")
+                    self.error_text.insert(tk.END, f"Position Error: {pos_error:.2f} mm\n\n")
+                    
+                    self.update_status(f"Moved to ({x}, {y}, {z}) - Error: {pos_error:.1f}mm")
+                else:
+                    self.error_text.insert(tk.END, "Warning: Could not verify solution\n")
+                    self.update_status(f"Moved to ({x}, {y}, {z}) - Unverified")
+                
+                self.error_text.see(tk.END)
+                
+            else:
+                self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
+                self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
+                self.error_text.insert(tk.END, f"Workspace limits (approximate):\n")
+                self.error_text.insert(tk.END, f"  X: -200 to 200 mm\n")
+                self.error_text.insert(tk.END, f"  Y: -200 to 200 mm\n")
+                self.error_text.insert(tk.END, f"  Z: 50 to 250 mm\n\n")
+                self.error_text.see(tk.END)
+                self.update_status("IK Failed: Position unreachable")
             
         except ValueError:
             self.error_text.insert(tk.END, "Error: Please enter valid numeric values for coordinates\n")
             self.error_text.see(tk.END)
             self.update_status("Error: Invalid coordinates")
+        except Exception as e:
+            self.error_text.insert(tk.END, f"Error: {str(e)}\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Error: {str(e)}")
             
     def reset_arm_position(self):
         """Reset arm to home position"""
