@@ -1,6 +1,44 @@
 <?xml version="1.0" ?>
 <robot name="JETANK" xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
+<!-- Base materials from jetank_description -->
+<material name="base_link_material">
+  <color rgba="0.25 0.25 0.25 1"/>
+</material>
+
+<material name="arm_material">
+  <color rgba="0.41 0.45 0.39 1"/>
+</material>
+
+<material name="wheel_material">
+  <color rgba="0.5 0.5 0.4 1"/>
+</material>
+
+<material name="camera_material">
+  <color rgba="0.84 0.74 0.60 1"/>
+</material>
+
+<material name="camera_holder_material">
+  <color rgba="0.0 0.5 0.5 1"/>
+</material>
+
+<material name="antenna_material">
+  <color rgba="0.2 0.2 0.2 1"/>
+</material>
+
+<material name="servo_material">
+  <color rgba="0.58 0.78 0.78 1"/>
+</material>
+
+<material name="gripper_material">
+  <color rgba="0.65 0.65 0.62 1"/>
+</material>
+
+<material name="bearing_material">
+  <color rgba="0.67 0.74 0.67 1"/>
+</material>
+
+<!-- Keep original silver as fallback -->
 <material name="silver">
   <color rgba="0.700 0.700 0.700 1.000"/>
 </material>
