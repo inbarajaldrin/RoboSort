@@ -27,6 +27,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'jetank_control_gui = JETANK_description.jetank_control_gui:main',
         ],
     },
 )
