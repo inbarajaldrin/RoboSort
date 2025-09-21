@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import time
+import subprocess
 
 class JETANKGripperControlGUI(Node):
     def __init__(self):
@@ -302,6 +303,22 @@ class JETANKGripperControlGUI(Node):
                   command=self.simple_open_gripper).pack(side=tk.LEFT, padx=5)
         ttk.Button(simple_button_frame, text="Close Gripper", 
                   command=self.simple_close_gripper).pack(side=tk.LEFT, padx=5)
+        ttk.Button(simple_button_frame, text="Get Gripper Pose", 
+                  command=self.get_gripper_pose).pack(side=tk.LEFT, padx=5)
+        
+        # Status text box for gripper control
+        gripper_status_frame = ttk.LabelFrame(gripper_frame, text="Gripper Status", padding="10")
+        gripper_status_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        self.gripper_status_text = tk.Text(gripper_status_frame, height=6, width=50, wrap=tk.WORD)
+        gripper_scrollbar = ttk.Scrollbar(gripper_status_frame, orient=tk.VERTICAL, command=self.gripper_status_text.yview)
+        self.gripper_status_text.configure(yscrollcommand=gripper_scrollbar.set)
+        
+        self.gripper_status_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        gripper_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Initialize with welcome message
+        self.gripper_status_text.insert(tk.END, "Gripper Control Ready\nUse the sliders or buttons to control the gripper\n")
         
     def on_closing(self):
         """Handle window closing"""
@@ -370,6 +387,108 @@ class JETANKGripperControlGUI(Node):
         self.error_text.insert(tk.END, "Arm reset to home position\n")
         self.error_text.see(tk.END)
         self.update_status("Arm reset to home position")
+        
+    def get_gripper_pose(self):
+        """Get gripper pose using tf2_echo command"""
+        try:
+            # Set ROS domain ID
+            import os
+            os.environ['ROS_DOMAIN_ID'] = '6'
+            
+            # Run tf2_echo command to get pose from BEARING_1 to GRIPPER_CENTER_LINK
+            cmd = ["ros2", "run", "tf2_ros", "tf2_echo", "BEARING_1", "GRIPPER_CENTER_LINK"]
+            
+            # Start the process
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                text=True,
+                env=os.environ.copy()
+            )
+            
+            # Read output line by line with timeout
+            output_lines = []
+            start_time = time.time()
+            timeout = 8  # 8 second timeout
+            
+            while time.time() - start_time < timeout:
+                # Check if process is still running
+                if process.poll() is not None:
+                    break
+                    
+                # Try to read a line
+                try:
+                    line = process.stdout.readline()
+                    if line:
+                        line = line.strip()
+                        output_lines.append(line)
+                        
+                        # Check if we got the transform data
+                        if "Translation:" in line:
+                            # Read a few more lines to get complete data
+                            for _ in range(3):
+                                try:
+                                    next_line = process.stdout.readline()
+                                    if next_line:
+                                        next_line = next_line.strip()
+                                        output_lines.append(next_line)
+                                except:
+                                    break
+                            break
+                            
+                except Exception as e:
+                    break
+            
+            # Kill the process if it's still running
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            
+            # Parse the output
+            for line in output_lines:
+                if "Translation:" in line:
+                    # Extract position values
+                    try:
+                        pos_data = line.split("Translation:")[1].strip()
+                        # Remove brackets and split by comma
+                        pos_data = pos_data.strip('[]')
+                        pos_values = [val.strip() for val in pos_data.split(',')]
+                        if len(pos_values) >= 3:
+                            x = float(pos_values[0])
+                            y = float(pos_values[1])
+                            z = float(pos_values[2])
+                            
+                            # Update the Arm Control tab coordinates
+                            if hasattr(self, 'x_var'):
+                                self.x_var.set(f"{x*1000:.1f}")  # Convert to mm
+                                self.y_var.set(f"{y*1000:.1f}")
+                                self.z_var.set(f"{z*1000:.1f}")
+                            
+                            # Show in gripper status text box
+                            if hasattr(self, 'gripper_status_text'):
+                                self.gripper_status_text.insert(tk.END, f"Current gripper pose: X={x*1000:.1f}mm, Y={y*1000:.1f}mm, Z={z*1000:.1f}mm\n")
+                                self.gripper_status_text.see(tk.END)
+                            
+                            self.update_status(f"Gripper pose: X={x*1000:.1f}mm, Y={y*1000:.1f}mm, Z={z*1000:.1f}mm")
+                            return
+                    except Exception as e:
+                        pass
+            
+            # If we get here, no valid position was found
+            self.update_status("Error: Could not get gripper pose")
+            if hasattr(self, 'gripper_status_text'):
+                self.gripper_status_text.insert(tk.END, "Error: Could not parse gripper pose from tf2_echo output\n")
+                self.gripper_status_text.see(tk.END)
+                    
+        except Exception as e:
+            self.update_status(f"Error: {str(e)}")
+            if hasattr(self, 'gripper_status_text'):
+                self.gripper_status_text.insert(tk.END, f"Error getting gripper pose: {str(e)}\n")
+                self.gripper_status_text.see(tk.END)
         
     def on_left_l1_change(self, value):
         """Handle left L1 slider change"""
