@@ -22,7 +22,7 @@ try:
     from ik import compute_ik, forward_kinematics, verify_solution
 except ImportError as e:
     # Try absolute path if relative path fails (for ros2 launch)
-    scripts_path_abs = '/home/ubuntu/new_ros2_ws/src/JETANK_description/scripts'
+    scripts_path_abs = '/home/ubuntu/ros2_ws/src/JETANK_description/scripts'
     if scripts_path_abs not in sys.path:
         sys.path.insert(0, scripts_path_abs)
     try:
