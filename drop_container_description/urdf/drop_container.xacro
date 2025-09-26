@@ -1,0 +1,462 @@
+<?xml version="1.0" ?>
+<robot name="drop_container" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find drop_container_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find drop_container_description)/urdf/drop_container.trans" />
+<xacro:include filename="$(find drop_container_description)/urdf/drop_container.gazebo" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.00027753454607127713 0.00010346324621890149 0.01831391799600729" rpy="0 0 0"/>
+    <mass value="2.0387660131302434"/>
+    <inertia ixx="0.016817" iyy="0.007716" izz="0.023184" ixy="0.0" iyz="-2e-06" ixz="-6e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="lid_1">
+  <inertial>
+    <origin xyz="-0.003661842248802144 2.960193493330791e-17 0.08750000000000005" rpy="0 0 0"/>
+    <mass value="0.9963378039888945"/>
+    <inertia ixx="0.009318" iyy="0.002647" izz="0.006673" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.0875 0.0 -0.056" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/lid_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.0875 0.0 -0.056" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/lid_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_01_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 -0.1105000000000001 0.14800000000000008" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_01_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_01_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_02_1">
+  <inertial>
+    <origin xyz="0.08549999999999996 -0.11050000000000008 0.09" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_02_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_02_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_03_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 -0.11050000000000006 0.031999999999999994" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_03_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_03_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_04_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 -0.05525000000000008 0.14800000000000008" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_04_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_04_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_05_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 -0.05525000000000006 0.09000000000000005" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_05_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_05_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_06_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 -0.05525000000000006 0.03200000000000002" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_06_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_06_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_07_1">
+  <inertial>
+    <origin xyz="0.08550000000000002 -8.829151401759714e-17 0.14800000000000008" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_07_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_07_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_08_1">
+  <inertial>
+    <origin xyz="0.0004999999999999866 -7.302800339756536e-17 5.551115123125783e-17" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.09 0.0 -0.1435" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_08_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.09 0.0 -0.1435" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_08_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_09_1">
+  <inertial>
+    <origin xyz="0.08549999999999996 -5.825792523292263e-17 0.03200000000000002" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_09_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_09_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_10_1">
+  <inertial>
+    <origin xyz="0.08549999999999998 0.05524999999999992 0.14800000000000008" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_11_1">
+  <inertial>
+    <origin xyz="0.08549999999999996 0.055249999999999924 0.09000000000000005" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_11_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_11_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_12_1">
+  <inertial>
+    <origin xyz="0.08549999999999996 0.05524999999999994 0.03200000000000005" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_12_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_12_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_13_1">
+  <inertial>
+    <origin xyz="0.08549999999999996 0.10999999999999992 0.14800000000000013" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_13_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_13_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_14_1">
+  <inertial>
+    <origin xyz="0.08549999999999994 0.10999999999999993 0.09000000000000008" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_14_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_14_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="aruco_15_1">
+  <inertial>
+    <origin xyz="0.08549999999999994 0.10999999999999993 0.03200000000000005" rpy="0 0 0"/>
+    <mass value="0.007065000000000037"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_15_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.175 0.0 -0.0535" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find drop_container_description)/meshes/aruco_15_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="1" type="revolute">
+  <origin xyz="-0.0875 0.0 0.056" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="lid_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit lower="-1.571" upper="1.571" effort="1000" velocity="1.0"/>
+</joint>
+
+<joint name="Rigid 1" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_01_1"/>
+</joint>
+
+<joint name="Rigid 2" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_02_1"/>
+</joint>
+
+<joint name="Rigid 3" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_03_1"/>
+</joint>
+
+<joint name="Rigid 4" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_04_1"/>
+</joint>
+
+<joint name="Rigid 5" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_05_1"/>
+</joint>
+
+<joint name="Rigid 6" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_06_1"/>
+</joint>
+
+<joint name="Rigid 7" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_07_1"/>
+</joint>
+
+<joint name="Rigid 8" type="fixed">
+  <origin xyz="-0.0025 0.0 0.0875" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_08_1"/>
+</joint>
+
+<joint name="Rigid 9" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_09_1"/>
+</joint>
+
+<joint name="Rigid 10" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_10_1"/>
+</joint>
+
+<joint name="Rigid 11" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_11_1"/>
+</joint>
+
+<joint name="Rigid 12" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_12_1"/>
+</joint>
+
+<joint name="Rigid 13" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_13_1"/>
+</joint>
+
+<joint name="Rigid 14" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_14_1"/>
+</joint>
+
+<joint name="Rigid 15" type="fixed">
+  <origin xyz="-0.0875 0.0 -0.0025" rpy="0 0 0"/>
+  <parent link="lid_1"/>
+  <child link="aruco_15_1"/>
+</joint>
+
+</robot>
