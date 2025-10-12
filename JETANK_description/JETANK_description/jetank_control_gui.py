@@ -16,7 +16,13 @@ import numpy as np
 import math
 
 # Add scripts directory to path and import IK functions
-scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
+try:
+    from ament_index_python.packages import get_package_share_directory
+    scripts_path = os.path.join(get_package_share_directory('JETANK_description'), 'scripts')
+except:
+    # Fallback to relative path
+    scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
+
 if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
@@ -24,7 +30,7 @@ try:
     from ik import compute_ik, forward_kinematics, verify_solution
 except ImportError as e:
     # Try absolute path if relative path fails (for ros2 launch)
-    scripts_path_abs = '/home/ubuntu/ros2_ws/src/JETANK_description/scripts'
+    scripts_path_abs = '/home/aaugus11/ros2_ws/src/JETANK_description/scripts'
     if scripts_path_abs not in sys.path:
         sys.path.insert(0, scripts_path_abs)
     try:

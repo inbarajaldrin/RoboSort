@@ -42,8 +42,53 @@ def generate_launch_description():
         output='screen'
     )
 
+    # End-Effector Pose Publisher
+    ee_pose_publisher_node = Node(
+        package='JETANK_description',
+        executable='ee_pose_publisher',
+        name='ee_pose_publisher',
+        parameters=[
+            {'base_frame': 'BEARING_1'},
+            {'ee_frame': 'GRIPPER_CENTER_LINK'},
+            {'publish_rate': 10.0},
+            {'startup_delay': 3.0}  # Wait 3 seconds for TF tree to be ready
+        ],
+        output='screen'
+    )
+
+    # Camera Pose Publisher
+    camera_pose_publisher_node = Node(
+        package='JETANK_description',
+        executable='camera_pose_publisher',
+        name='camera_pose_publisher',
+        parameters=[
+            {'base_frame': 'BEARING_1'},
+            {'camera_frame': 'CAMERA_1'},
+            {'publish_rate': 10.0},
+            {'startup_delay': 3.0}  # Wait 3 seconds for TF tree to be ready
+        ],
+        output='screen'
+    )
+
+    # Camera to End-Effector Pose Publisher
+    camera_to_ee_pose_publisher_node = Node(
+        package='JETANK_description',
+        executable='camera_to_ee_pose_publisher',
+        name='camera_to_ee_pose_publisher',
+        parameters=[
+            {'camera_frame': 'CAMERA_1'},
+            {'ee_frame': 'GRIPPER_CENTER_LINK'},
+            {'publish_rate': 10.0},
+            {'startup_delay': 3.0}  # Wait 3 seconds for TF tree to be ready
+        ],
+        output='screen'
+    )
+
     return LaunchDescription([
         robot_state_publisher_node,
         jetank_control_gui_node,
+        ee_pose_publisher_node,
+        camera_pose_publisher_node,
+        camera_to_ee_pose_publisher_node,
         rviz_node
     ])

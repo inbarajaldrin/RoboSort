@@ -28,6 +28,9 @@ setup(
     entry_points={
         'console_scripts': [
             'jetank_control_gui = JETANK_description.jetank_control_gui:main',
+            'ee_pose_publisher = JETANK_description.ee_pose_publisher:main',
+            'camera_pose_publisher = JETANK_description.camera_pose_publisher:main',
+            'camera_to_ee_pose_publisher = JETANK_description.camera_to_ee_pose_publisher:main',
         ],
     },
 )
