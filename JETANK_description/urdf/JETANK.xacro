@@ -15,7 +15,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="base_link_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -36,7 +36,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="antenna_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="-0.070085 0.055118 0.007934" rpy="0 0 0"/>
@@ -57,7 +57,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="bearing_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.046079 0.010536 -0.01116" rpy="0 0 0"/>
@@ -78,7 +78,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="arm_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.046079 0.010553 -0.01919" rpy="0 0 0"/>
@@ -99,7 +99,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="wheel_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="-0.05431 0.054968 0.052234" rpy="0 0 0"/>
@@ -120,7 +120,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="wheel_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.063868 -0.033862 0.052048" rpy="0 0 0"/>
@@ -141,7 +141,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="camera_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.104728 0.010412 -0.053571" rpy="0 0 0"/>
@@ -162,7 +162,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="camera_holder_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.070879 0.010535 -0.053571" rpy="0 0 0"/>
@@ -183,7 +183,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.174488 0.004873 -0.179831" rpy="0 0 0"/>
@@ -204,7 +204,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.204487 0.004763 -0.179731" rpy="0 0 0"/>
@@ -225,7 +225,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="servo_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.059673 0.009093 -0.181342" rpy="0 0 0"/>
@@ -246,7 +246,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="arm_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.059673 0.008894 -0.086342" rpy="0 0 0"/>
@@ -267,7 +267,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="servo_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.032586 -0.009458 -0.086381" rpy="0 0 0"/>
@@ -288,7 +288,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="wheel_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="-0.054631 -0.033431 0.052049" rpy="0 0 0"/>
@@ -309,7 +309,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="wheel_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.064189 0.054537 0.052234" rpy="0 0 0"/>
@@ -330,7 +330,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.204524 0.014764 -0.17981" rpy="0 0 0"/>
@@ -351,7 +351,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.174524 0.014872 -0.17981" rpy="0 0 0"/>
@@ -372,7 +372,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.130006 0.010025 -0.18132" rpy="0 0 0"/>
@@ -393,7 +393,7 @@
     <geometry>
       <box size="0.01 0.01 0.01"/>
     </geometry>
-    <material name="gripper_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -414,7 +414,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="arm_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="0.08725 0.030359 -0.188797" rpy="0 0 0"/>
@@ -435,7 +435,7 @@
     <geometry>
       <mesh filename="file://$(find JETANK_description)/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
     </geometry>
-    <material name="antenna_material"/>
+    <material name="silver"/>
   </visual>
   <collision>
     <origin xyz="-0.070406 -0.033281 0.007749" rpy="0 0 0"/>
@@ -487,10 +487,12 @@
   <child link="CAMERA_1"/>
 </joint>
 
-<joint name="rigid_CAMERA_HOLDER_ARM_LOWER" type="fixed">
+<joint name="revolute_CAMERA_HOLDER_ARM_LOWER" type="revolute">
   <origin xyz="-0.0248 1.8e-05 0.034381" rpy="0 0 0"/>
   <parent link="ARM_LOWER_1"/>
   <child link="CAM_HOLDER_1"/>
+  <axis xyz="0 1 0"/>
+  <limit upper="0.785398" lower="-0.785398" effort="100" velocity="100"/>
 </joint>
 
 <joint name="revolute_GRIPPER_L1" type="revolute">

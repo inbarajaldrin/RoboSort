@@ -16,13 +16,7 @@ import numpy as np
 import math
 
 # Add scripts directory to path and import IK functions
-try:
-    from ament_index_python.packages import get_package_share_directory
-    scripts_path = os.path.join(get_package_share_directory('JETANK_description'), 'scripts')
-except:
-    # Fallback to relative path
-    scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
-
+scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
 if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
@@ -30,7 +24,7 @@ try:
     from ik import compute_ik, forward_kinematics, verify_solution
 except ImportError as e:
     # Try absolute path if relative path fails (for ros2 launch)
-    scripts_path_abs = '/home/aaugus11/ros2_ws/src/JETANK_description/scripts'
+    scripts_path_abs = '/home/ubuntu/ros2_ws/src/JETANK_description/scripts'
     if scripts_path_abs not in sys.path:
         sys.path.insert(0, scripts_path_abs)
     try:
@@ -56,22 +50,23 @@ class JETANKGripperControlGUI(Node):
         self.joint_state = JointState()
         self.joint_state.header.frame_id = ''
         self.joint_state.name = [
-            'revolute_BEARING',           # Arm base rotation: -1.5708 to 1.5708
-            'revolute_FREE_WHEEL_LEFT',   # Left free wheel: 0.0 to 6.283185
-            'revolute_FREE_WHEEL_RIGHT',  # Right free wheel: 0.0 to 6.283185
-            'revolute_GRIPPER_L1',        # Left gripper L1: -0.785398 to 0.0
-            'revolute_GRIPPER_L2',        # Left gripper L2: -0.785398 to 0.0
-            'Revolute_SERVO_UPPER',       # Upper arm servo: -3.1418 to 0.785594
-            'Revolute_SERVO_LOWER',       # Lower arm servo: 0.0 to 1.570796
-            'Revolute_DRIVING_WHEEL_R',   # Right driving wheel: 0.0 to 6.283185
-            'Revolute_DRIVING_WHEEL_L',   # Left driving wheel: 0.0 to 6.283185
-            'Revolute_GRIPPER_R2',        # Right gripper R2: -0.785398 to 0.0
-            'Revolute_GRIPPER_R1'         # Right gripper R1: 0.0 to 0.785398
+            'revolute_BEARING',                  # Arm base rotation: -1.5708 to 1.5708
+            'revolute_FREE_WHEEL_LEFT',          # Left free wheel: 0.0 to 6.283185
+            'revolute_FREE_WHEEL_RIGHT',         # Right free wheel: 0.0 to 6.283185
+            'revolute_GRIPPER_L1',               # Left gripper L1: -0.785398 to 0.0
+            'revolute_GRIPPER_L2',               # Left gripper L2: -0.785398 to 0.0
+            'Revolute_SERVO_UPPER',              # Upper arm servo: -3.1418 to 0.785594
+            'Revolute_SERVO_LOWER',              # Lower arm servo: 0.0 to 1.570796
+            'Revolute_DRIVING_WHEEL_R',          # Right driving wheel: 0.0 to 6.283185
+            'Revolute_DRIVING_WHEEL_L',          # Left driving wheel: 0.0 to 6.283185
+            'Revolute_GRIPPER_R2',               # Right gripper R2: -0.785398 to 0.0
+            'Revolute_GRIPPER_R1',               # Right gripper R1: 0.0 to 0.785398
+            'revolute_CAMERA_HOLDER_ARM_LOWER'   # Camera tilt: -0.785398 to 0.785398 (±45 degrees)
         ]
         # Initialize all joints to default positions (0.0 for most, except wheels which can be 0.0)
-        self.joint_state.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        self.joint_state.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        self.joint_state.effort = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.joint_state.position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.joint_state.velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.joint_state.effort = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         
         # Store joint indices for easier access
         self.gripper_joint_indices = {
@@ -85,6 +80,10 @@ class JETANKGripperControlGUI(Node):
             'BEARING': 0,    # revolute_BEARING
             'SERVO_LOWER': 6, # Revolute_SERVO_LOWER
             'SERVO_UPPER': 5  # Revolute_SERVO_UPPER
+        }
+        
+        self.camera_joint_indices = {
+            'CAMERA_TILT': 11  # revolute_CAMERA_HOLDER_ARM_LOWER
         }
         
         # Threading control
@@ -112,7 +111,7 @@ class JETANKGripperControlGUI(Node):
         """Create the Tkinter GUI in the GUI thread"""
         self.root = tk.Tk()
         self.root.title("JETANK Gripper Controller")
-        self.root.geometry("450x500")
+        self.root.geometry("450x580")
         
         # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -185,6 +184,20 @@ class JETANKGripperControlGUI(Node):
         self.servo_upper_scale.pack(fill=tk.X, pady=2)
         self.servo_upper_label = ttk.Label(arm_frame, text="0.000")
         self.servo_upper_label.pack(anchor=tk.W)
+        
+        # Camera Control
+        camera_frame = ttk.LabelFrame(individual_frame, text="Camera Control", padding="10")
+        camera_frame.pack(fill=tk.X, pady=5)
+        
+        # Camera Tilt
+        ttk.Label(camera_frame, text="Camera Tilt (±45°):").pack(anchor=tk.W)
+        self.camera_tilt_var = tk.DoubleVar(value=0.0)
+        self.camera_tilt_scale = ttk.Scale(camera_frame, from_=-0.785398, to=0.785398,
+                                           variable=self.camera_tilt_var, orient=tk.HORIZONTAL,
+                                           command=self.on_camera_tilt_change)
+        self.camera_tilt_scale.pack(fill=tk.X, pady=2)
+        self.camera_tilt_label = ttk.Label(camera_frame, text="0.000 rad (0.0°)")
+        self.camera_tilt_label.pack(anchor=tk.W)
         
         # Left Gripper Control
         left_frame = ttk.LabelFrame(individual_frame, text="Left Gripper", padding="10")
@@ -404,6 +417,14 @@ class JETANKGripperControlGUI(Node):
         self.servo_upper_label.config(text=f"{pos:.3f}")
         self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = pos
         self.update_status(f"Upper Servo: {pos:.3f}")
+    
+    def on_camera_tilt_change(self, value):
+        """Handle camera tilt slider change"""
+        pos = float(value)
+        degrees = math.degrees(pos)
+        self.camera_tilt_label.config(text=f"{pos:.3f} rad ({degrees:.1f}°)")
+        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = pos
+        self.update_status(f"Camera Tilt: {pos:.3f} rad ({degrees:.1f}°)")
         
     def move_to_position(self):
         """Move arm to specified x, y, z position using inverse kinematics"""
@@ -497,19 +518,24 @@ class JETANKGripperControlGUI(Node):
         self.servo_lower_var.set(0.0)
         self.servo_upper_var.set(0.0)
         
+        # Reset camera tilt
+        self.camera_tilt_var.set(0.0)
+        
         # Update joint positions
         self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
         self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
         self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
         
         # Update labels
         self.bearing_label.config(text="0.000")
         self.servo_lower_label.config(text="0.000")
         self.servo_upper_label.config(text="0.000")
+        self.camera_tilt_label.config(text="0.000 rad (0.0°)")
         
-        self.error_text.insert(tk.END, "Arm reset to home position\n")
+        self.error_text.insert(tk.END, "Arm and camera reset to home position\n")
         self.error_text.see(tk.END)
-        self.update_status("Arm reset to home position")
+        self.update_status("Arm and camera reset to home position")
         
     def move_with_trajectory(self):
         """Move arm to specified x, y, z position using inverse kinematics with timed trajectory"""
@@ -992,17 +1018,22 @@ class JETANKGripperControlGUI(Node):
         self.servo_lower_var.set(0.0)
         self.servo_upper_var.set(0.0)
         
+        # Reset camera tilt
+        self.camera_tilt_var.set(0.0)
+        
         # Update joint positions
         self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
         self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
         self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
         
         # Update labels
         self.bearing_label.config(text="0.000")
         self.servo_lower_label.config(text="0.000")
         self.servo_upper_label.config(text="0.000")
+        self.camera_tilt_label.config(text="0.000 rad (0.0°)")
         
-        self.update_status("Gripper and arm reset")
+        self.update_status("Gripper, arm, and camera reset")
         
     def update_status(self, message):
         """Update status label"""

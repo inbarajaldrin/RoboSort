@@ -34,6 +34,17 @@
   </actuator>
 </transmission>
 
+<transmission name="revolute_CAMERA_HOLDER_ARM_LOWER_tran">
+  <type>transmission_interface/SimpleTransmission</type>
+  <joint name="revolute_CAMERA_HOLDER_ARM_LOWER">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+  </joint>
+  <actuator name="revolute_CAMERA_HOLDER_ARM_LOWER_actr">
+    <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    <mechanicalReduction>1</mechanicalReduction>
+  </actuator>
+</transmission>
+
 <transmission name="revolute_GRIPPER_L1_tran">
   <type>transmission_interface/SimpleTransmission</type>
   <joint name="revolute_GRIPPER_L1">
