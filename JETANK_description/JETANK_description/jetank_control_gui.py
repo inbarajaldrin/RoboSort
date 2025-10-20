@@ -20,21 +20,19 @@ scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts
 if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
+# Also try the symlinked path in ros2_ws
+scripts_path_ws = '/home/aaugus11/ros2_ws/src/JETANK_description/scripts'
+if scripts_path_ws not in sys.path:
+    sys.path.insert(0, scripts_path_ws)
+
 try:
     from ik import compute_ik, forward_kinematics, verify_solution
 except ImportError as e:
-    # Try absolute path if relative path fails (for ros2 launch)
-    scripts_path_abs = '/home/ubuntu/ros2_ws/src/JETANK_description/scripts'
-    if scripts_path_abs not in sys.path:
-        sys.path.insert(0, scripts_path_abs)
-    try:
-        from ik import compute_ik, forward_kinematics, verify_solution
-    except ImportError as e2:
-        print(f"Warning: Could not import IK functions: {e2}")
-        print("IK functionality will be disabled.")
-        compute_ik = None
-        forward_kinematics = None
-        verify_solution = None
+    print(f"Warning: Could not import IK functions: {e}")
+    print("IK functionality will be disabled.")
+    compute_ik = None
+    forward_kinematics = None
+    verify_solution = None
 
 class JETANKGripperControlGUI(Node):
     def __init__(self):
@@ -247,10 +245,6 @@ class JETANKGripperControlGUI(Node):
         button_frame = ttk.Frame(individual_frame)
         button_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(button_frame, text="Open Gripper", 
-                  command=self.open_gripper).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Close Gripper", 
-                  command=self.close_gripper).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset All", 
                   command=self.reset_gripper).pack(side=tk.LEFT, padx=5)
                   
@@ -295,12 +289,21 @@ class JETANKGripperControlGUI(Node):
         self.z_entry.pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(z_frame, text="mm").pack(side=tk.LEFT, padx=(5, 0))
         
-        # Duration input
-        duration_frame = ttk.Frame(arm_control_frame)
-        duration_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(duration_frame, text="Duration (sec):").pack(side=tk.LEFT)
+        # Trajectory control
+        trajectory_frame = ttk.Frame(arm_control_frame)
+        trajectory_frame.pack(fill=tk.X, pady=5)
+        self.use_trajectory_var = tk.BooleanVar(value=True)
+        self.trajectory_checkbox = ttk.Checkbutton(trajectory_frame, text="Use Trajectory Movement", 
+                                                  variable=self.use_trajectory_var,
+                                                  command=self.on_trajectory_checkbox_change)
+        self.trajectory_checkbox.pack(side=tk.LEFT)
+        
+        # Duration input (always visible)
+        self.duration_frame = ttk.Frame(arm_control_frame)
+        self.duration_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(self.duration_frame, text="Duration (sec):").pack(side=tk.LEFT)
         self.duration_var = tk.StringVar(value="3.0")
-        self.duration_entry = ttk.Entry(duration_frame, textvariable=self.duration_var, width=10)
+        self.duration_entry = ttk.Entry(self.duration_frame, textvariable=self.duration_var, width=10)
         self.duration_entry.pack(side=tk.LEFT, padx=(5, 0))
         
         # Move button
@@ -308,12 +311,10 @@ class JETANKGripperControlGUI(Node):
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Move to Position", 
                   command=self.move_to_position).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Move with Trajectory", 
-                  command=self.move_with_trajectory).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Stop Trajectory", 
-                  command=self.stop_trajectory).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Reset Position", 
                   command=self.reset_arm_position).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Stop Trajectory", 
+                  command=self.stop_trajectory).pack(side=tk.LEFT, padx=5)
         
         # Error message text box
         error_frame = ttk.LabelFrame(arm_control_frame, text="Status & Messages", padding="10")
@@ -328,8 +329,10 @@ class JETANKGripperControlGUI(Node):
         
         # Initialize with welcome message
         self.error_text.insert(tk.END, "Arm Control Ready\n")
-        self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position' for instant movement\n")
-        self.error_text.insert(tk.END, "Or click 'Move with Trajectory' for smooth timed movement\n")
+        self.error_text.insert(tk.END, "Check 'Use Trajectory Movement' to enable smooth timed movement\n")
+        self.error_text.insert(tk.END, "Duration field is always visible - change it anytime (default: 3.0 sec)\n")
+        self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position'\n")
+        self.error_text.insert(tk.END, "Click 'Reset Position' to return to home position\n")
         self.error_text.insert(tk.END, "Inverse Kinematics will calculate the required joint angles\n\n")
         self.error_text.insert(tk.END, "Workspace limits (approximate):\n")
         self.error_text.insert(tk.END, "  X: -200 to 200 mm\n")
@@ -367,14 +370,31 @@ class JETANKGripperControlGUI(Node):
         self.simple_right_label = ttk.Label(right_simple_frame, text="0.000 (Closed)")
         self.simple_right_label.pack(anchor=tk.W)
         
+        # Gripper trajectory control
+        gripper_trajectory_frame = ttk.Frame(gripper_frame)
+        gripper_trajectory_frame.pack(fill=tk.X, pady=5)
+        self.use_gripper_trajectory_var = tk.BooleanVar(value=True)
+        self.gripper_trajectory_checkbox = ttk.Checkbutton(gripper_trajectory_frame, text="Use Gripper Trajectory Movement", 
+                                                          variable=self.use_gripper_trajectory_var,
+                                                          command=self.on_gripper_trajectory_checkbox_change)
+        self.gripper_trajectory_checkbox.pack(side=tk.LEFT)
+        
+        # Gripper duration input (always visible)
+        self.gripper_duration_frame = ttk.Frame(gripper_frame)
+        self.gripper_duration_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(self.gripper_duration_frame, text="Gripper Duration (sec):").pack(side=tk.LEFT)
+        self.gripper_duration_var = tk.StringVar(value="1.0")
+        self.gripper_duration_entry = ttk.Entry(self.gripper_duration_frame, textvariable=self.gripper_duration_var, width=10)
+        self.gripper_duration_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
         # Simple control buttons
         simple_button_frame = ttk.Frame(gripper_frame)
         simple_button_frame.pack(fill=tk.X, pady=10)
         
         ttk.Button(simple_button_frame, text="Open Gripper", 
-                  command=self.simple_open_gripper).pack(side=tk.LEFT, padx=5)
+                  command=self.open_gripper).pack(side=tk.LEFT, padx=5)
         ttk.Button(simple_button_frame, text="Close Gripper", 
-                  command=self.simple_close_gripper).pack(side=tk.LEFT, padx=5)
+                  command=self.close_gripper).pack(side=tk.LEFT, padx=5)
         ttk.Button(simple_button_frame, text="Get Gripper Pose", 
                   command=self.get_gripper_pose).pack(side=tk.LEFT, padx=5)
         
@@ -440,63 +460,121 @@ class JETANKGripperControlGUI(Node):
                 self.update_status("Error: IK functions unavailable")
                 return
             
-            self.error_text.insert(tk.END, f"Computing IK for position: X={x}mm, Y={y}mm, Z={z}mm\n")
-            self.error_text.see(tk.END)
-            self.update_status(f"Computing IK for ({x}, {y}, {z})")
-            
-            # Compute inverse kinematics
-            joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
-            
-            if joint_angles is not None:
-                # Extract joint angles
-                theta0 = joint_angles[0]  # revolute_BEARING
-                theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
-                theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
+            # Check if trajectory is enabled
+            if self.use_trajectory_var.get():
+                # Use trajectory movement
+                duration = float(self.duration_var.get())
                 
-                # Update GUI sliders and joint positions
-                self.bearing_var.set(theta0)
-                self.servo_lower_var.set(theta1)
-                self.servo_upper_var.set(theta3)
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
                 
-                # Update joint state message
-                self.joint_state.position[self.arm_joint_indices['BEARING']] = theta0
-                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = theta1
-                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = theta3
+                self.error_text.insert(tk.END, f"Computing IK for trajectory: X={x}mm, Y={y}mm, Z={z}mm, Duration={duration}s\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Computing IK trajectory for ({x}, {y}, {z})")
                 
-                # Update labels
-                self.bearing_label.config(text=f"{theta0:.3f}")
-                self.servo_lower_label.config(text=f"{theta1:.3f}")
-                self.servo_upper_label.config(text=f"{theta3:.3f}")
+                # Compute inverse kinematics
+                joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
                 
-                # Verify the solution by computing forward kinematics
-                T, actual_pos = forward_kinematics(theta0, theta1, theta3)
-                if actual_pos is not None:
-                    pos_error = np.linalg.norm(np.array(actual_pos) - np.array([x, y, z]))
+                if joint_angles is not None:
+                    # Extract joint angles
+                    theta0 = joint_angles[0]  # revolute_BEARING
+                    theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
+                    theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
                     
-                    self.error_text.insert(tk.END, f"IK Solution Found:\n")
-                    self.error_text.insert(tk.END, f"  Base Bearing: {theta0:.4f} rad ({math.degrees(theta0):.2f}°)\n")
-                    self.error_text.insert(tk.END, f"  Lower Servo: {theta1:.4f} rad ({math.degrees(theta1):.2f}°)\n")
-                    self.error_text.insert(tk.END, f"  Upper Servo: {theta3:.4f} rad ({math.degrees(theta3):.2f}°)\n")
-                    self.error_text.insert(tk.END, f"Target: [{x:.1f}, {y:.1f}, {z:.1f}] mm\n")
-                    self.error_text.insert(tk.END, f"Actual: [{actual_pos[0]:.1f}, {actual_pos[1]:.1f}, {actual_pos[2]:.1f}] mm\n")
-                    self.error_text.insert(tk.END, f"Position Error: {pos_error:.2f} mm\n\n")
+                    # Get current joint positions
+                    current_joints = [
+                        self.joint_state.position[self.arm_joint_indices['BEARING']],
+                        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']],
+                        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']]
+                    ]
                     
-                    self.update_status(f"Moved to ({x}, {y}, {z}) - Error: {pos_error:.1f}mm")
+                    # Target joint positions
+                    target_joints = [theta0, theta1, theta3]
+                    
+                    # Start trajectory execution in separate thread
+                    self.trajectory_active = True
+                    self.trajectory_thread = threading.Thread(
+                        target=self.execute_trajectory, 
+                        args=(current_joints, target_joints, duration),
+                        daemon=True
+                    )
+                    self.trajectory_thread.start()
+                    
+                    self.error_text.insert(tk.END, f"Trajectory started:\n")
+                    self.error_text.insert(tk.END, f"  From: [{current_joints[0]:.3f}, {current_joints[1]:.3f}, {current_joints[2]:.3f}]\n")
+                    self.error_text.insert(tk.END, f"  To: [{theta0:.3f}, {theta1:.3f}, {theta3:.3f}]\n")
+                    self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                    self.error_text.see(tk.END)
+                    self.update_status(f"Executing trajectory to ({x}, {y}, {z})")
+                    
                 else:
-                    self.error_text.insert(tk.END, "Warning: Could not verify solution\n")
-                    self.update_status(f"Moved to ({x}, {y}, {z}) - Unverified")
-                
-                self.error_text.see(tk.END)
-                
+                    self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
+                    self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("IK Failed: Position unreachable")
             else:
-                self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
-                self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
-                self.error_text.insert(tk.END, f"Workspace limits (approximate):\n")
-                self.error_text.insert(tk.END, f"  X: -200 to 200 mm\n")
-                self.error_text.insert(tk.END, f"  Y: -200 to 200 mm\n")
-                self.error_text.insert(tk.END, f"  Z: 50 to 250 mm\n\n")
+                # Use instant movement
+                self.error_text.insert(tk.END, f"Computing IK for position: X={x}mm, Y={y}mm, Z={z}mm\n")
                 self.error_text.see(tk.END)
-                self.update_status("IK Failed: Position unreachable")
+                self.update_status(f"Computing IK for ({x}, {y}, {z})")
+                
+                # Compute inverse kinematics
+                joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
+                
+                if joint_angles is not None:
+                    # Extract joint angles
+                    theta0 = joint_angles[0]  # revolute_BEARING
+                    theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
+                    theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
+                    
+                    # Update GUI sliders and joint positions
+                    self.bearing_var.set(theta0)
+                    self.servo_lower_var.set(theta1)
+                    self.servo_upper_var.set(theta3)
+                    
+                    # Update joint state message
+                    self.joint_state.position[self.arm_joint_indices['BEARING']] = theta0
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = theta1
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = theta3
+                    
+                    # Update labels
+                    self.bearing_label.config(text=f"{theta0:.3f}")
+                    self.servo_lower_label.config(text=f"{theta1:.3f}")
+                    self.servo_upper_label.config(text=f"{theta3:.3f}")
+                    
+                    # Verify the solution by computing forward kinematics
+                    T, actual_pos = forward_kinematics(theta0, theta1, theta3)
+                    if actual_pos is not None:
+                        pos_error = np.linalg.norm(np.array(actual_pos) - np.array([x, y, z]))
+                        
+                        self.error_text.insert(tk.END, f"IK Solution Found:\n")
+                        self.error_text.insert(tk.END, f"  Base Bearing: {theta0:.4f} rad ({math.degrees(theta0):.2f}°)\n")
+                        self.error_text.insert(tk.END, f"  Lower Servo: {theta1:.4f} rad ({math.degrees(theta1):.2f}°)\n")
+                        self.error_text.insert(tk.END, f"  Upper Servo: {theta3:.4f} rad ({math.degrees(theta3):.2f}°)\n")
+                        self.error_text.insert(tk.END, f"Target: [{x:.1f}, {y:.1f}, {z:.1f}] mm\n")
+                        self.error_text.insert(tk.END, f"Actual: [{actual_pos[0]:.1f}, {actual_pos[1]:.1f}, {actual_pos[2]:.1f}] mm\n")
+                        self.error_text.insert(tk.END, f"Position Error: {pos_error:.2f} mm\n\n")
+                        
+                        self.update_status(f"Moved to ({x}, {y}, {z}) - Error: {pos_error:.1f}mm")
+                    else:
+                        self.error_text.insert(tk.END, "Warning: Could not verify solution\n")
+                        self.update_status(f"Moved to ({x}, {y}, {z}) - Unverified")
+                    
+                    self.error_text.see(tk.END)
+                    
+                else:
+                    self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
+                    self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
+                    self.error_text.insert(tk.END, f"Workspace limits (approximate):\n")
+                    self.error_text.insert(tk.END, f"  X: -200 to 200 mm\n")
+                    self.error_text.insert(tk.END, f"  Y: -200 to 200 mm\n")
+                    self.error_text.insert(tk.END, f"  Z: 50 to 250 mm\n\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("IK Failed: Position unreachable")
             
         except ValueError:
             self.error_text.insert(tk.END, "Error: Please enter valid numeric values for coordinates\n")
@@ -509,68 +587,23 @@ class JETANKGripperControlGUI(Node):
             
     def reset_arm_position(self):
         """Reset arm to home position"""
+        # Reset coordinate inputs
         self.x_var.set("0.0")
         self.y_var.set("0.0")
         self.z_var.set("0.0")
         
-        # Reset arm joints to default positions
-        self.bearing_var.set(0.0)
-        self.servo_lower_var.set(0.0)
-        self.servo_upper_var.set(0.0)
-        
-        # Reset camera tilt
-        self.camera_tilt_var.set(0.0)
-        
-        # Update joint positions
-        self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
-        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
-        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
-        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
-        
-        # Update labels
-        self.bearing_label.config(text="0.000")
-        self.servo_lower_label.config(text="0.000")
-        self.servo_upper_label.config(text="0.000")
-        self.camera_tilt_label.config(text="0.000 rad (0.0°)")
-        
-        self.error_text.insert(tk.END, "Arm and camera reset to home position\n")
-        self.error_text.see(tk.END)
-        self.update_status("Arm and camera reset to home position")
-        
-    def move_with_trajectory(self):
-        """Move arm to specified x, y, z position using inverse kinematics with timed trajectory"""
-        try:
-            x = float(self.x_var.get())
-            y = float(self.y_var.get())
-            z = float(self.z_var.get())
-            duration = float(self.duration_var.get())
-            
-            # Check if IK functions are available
-            if compute_ik is None:
-                self.error_text.insert(tk.END, "Error: IK functions not available. Check ik.py import.\n")
-                self.error_text.see(tk.END)
-                self.update_status("Error: IK functions unavailable")
-                return
-            
-            # Check if trajectory is already active
-            if self.trajectory_active:
-                self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
-                self.error_text.see(tk.END)
-                self.update_status("Error: Trajectory in progress")
-                return
-            
-            self.error_text.insert(tk.END, f"Computing IK for trajectory: X={x}mm, Y={y}mm, Z={z}mm, Duration={duration}s\n")
-            self.error_text.see(tk.END)
-            self.update_status(f"Computing IK trajectory for ({x}, {y}, {z})")
-            
-            # Compute inverse kinematics
-            joint_angles = compute_ik(x, y, z, max_tries=5, position_tolerance=2.0)
-            
-            if joint_angles is not None:
-                # Extract joint angles
-                theta0 = joint_angles[0]  # revolute_BEARING
-                theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
-                theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
+        # Check if trajectory is enabled
+        if self.use_trajectory_var.get():
+            # Use trajectory reset
+            try:
+                duration = float(self.duration_var.get())
+                
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
                 
                 # Get current joint positions
                 current_joints = [
@@ -579,40 +612,67 @@ class JETANKGripperControlGUI(Node):
                     self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']]
                 ]
                 
-                # Target joint positions
-                target_joints = [theta0, theta1, theta3]
+                # Target joint positions (home position)
+                target_joints = [0.0, 0.0, 0.0]
                 
                 # Start trajectory execution in separate thread
                 self.trajectory_active = True
                 self.trajectory_thread = threading.Thread(
-                    target=self.execute_trajectory, 
+                    target=self.execute_reset_trajectory, 
                     args=(current_joints, target_joints, duration),
                     daemon=True
                 )
                 self.trajectory_thread.start()
                 
-                self.error_text.insert(tk.END, f"Trajectory started:\n")
+                self.error_text.insert(tk.END, f"Reset trajectory started:\n")
                 self.error_text.insert(tk.END, f"  From: [{current_joints[0]:.3f}, {current_joints[1]:.3f}, {current_joints[2]:.3f}]\n")
-                self.error_text.insert(tk.END, f"  To: [{theta0:.3f}, {theta1:.3f}, {theta3:.3f}]\n")
+                self.error_text.insert(tk.END, f"  To: [0.000, 0.000, 0.000] (Home)\n")
                 self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
                 self.error_text.see(tk.END)
-                self.update_status(f"Executing trajectory to ({x}, {y}, {z})")
+                self.update_status(f"Executing reset trajectory to home position")
                 
-            else:
-                self.error_text.insert(tk.END, f"IK Failed: No solution found for target position\n")
-                self.error_text.insert(tk.END, f"Position may be outside workspace or unreachable\n")
+            except ValueError:
+                self.error_text.insert(tk.END, "Error: Please enter valid numeric value for duration\n")
                 self.error_text.see(tk.END)
-                self.update_status("IK Failed: Position unreachable")
+                self.update_status("Error: Invalid duration")
+            except Exception as e:
+                self.error_text.insert(tk.END, f"Error: {str(e)}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Error: {str(e)}")
+        else:
+            # Use instant reset
+            # Reset arm joints to default positions
+            self.bearing_var.set(0.0)
+            self.servo_lower_var.set(0.0)
+            self.servo_upper_var.set(0.0)
             
-        except ValueError:
-            self.error_text.insert(tk.END, "Error: Please enter valid numeric values for coordinates and duration\n")
-            self.error_text.see(tk.END)
-            self.update_status("Error: Invalid input values")
-        except Exception as e:
-            self.error_text.insert(tk.END, f"Error: {str(e)}\n")
-            self.error_text.see(tk.END)
-            self.update_status(f"Error: {str(e)}")
+            # Reset camera tilt
+            self.camera_tilt_var.set(0.0)
             
+            # Update joint positions
+            self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
+            self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
+            self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
+            
+            # Update labels
+            self.bearing_label.config(text="0.000")
+            self.servo_lower_label.config(text="0.000")
+            self.servo_upper_label.config(text="0.000")
+            self.camera_tilt_label.config(text="0.000 rad (0.0°)")
+            
+            self.error_text.insert(tk.END, "Arm and camera reset to home position\n")
+            self.error_text.see(tk.END)
+            self.update_status("Arm and camera reset to home position")
+        
+    def on_trajectory_checkbox_change(self):
+        """Handle trajectory checkbox change"""
+        pass
+        
+    def on_gripper_trajectory_checkbox_change(self):
+        """Handle gripper trajectory checkbox change"""
+        pass
+        
     def execute_trajectory(self, start_joints, target_joints, duration):
         """Execute smooth trajectory from start to target joint positions"""
         try:
@@ -727,6 +787,240 @@ class JETANKGripperControlGUI(Node):
         self.error_text.insert(tk.END, f"Trajectory error: {error_msg}\n")
         self.error_text.see(tk.END)
         self.update_status(f"Trajectory error: {error_msg}")
+        
+    def execute_reset_trajectory(self, start_joints, target_joints, duration):
+        """Execute smooth trajectory from current position to home position (0,0,0)"""
+        try:
+            # Calculate number of steps (50 steps per second for smooth motion)
+            steps = max(10, int(duration * 50))
+            dt = duration / steps
+            
+            # Create trajectory points
+            trajectory_points = []
+            
+            for i in range(steps + 1):
+                # Calculate interpolation factor (0 to 1)
+                t = i / steps
+                
+                # Smooth interpolation using cubic easing
+                t_smooth = 3 * t**2 - 2 * t**3  # Smooth start and end
+                
+                # Interpolate joint positions
+                current_positions = []
+                for j in range(3):
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Create trajectory point
+                point = JointTrajectoryPoint()
+                point.positions = current_positions
+                point.time_from_start = Duration(sec=int(t * duration), nanosec=int(((t * duration) % 1) * 1e9))
+                
+                trajectory_points.append(point)
+            
+            # Create and publish trajectory
+            traj = JointTrajectory()
+            traj.joint_names = ['revolute_BEARING', 'Revolute_SERVO_LOWER', 'Revolute_SERVO_UPPER']
+            traj.points = trajectory_points
+            
+            # Publish trajectory
+            self.trajectory_pub.publish(traj)
+            
+            # Update GUI in real-time during trajectory execution
+            start_time = time.time()
+            while time.time() - start_time < duration and self.trajectory_active:
+                elapsed = time.time() - start_time
+                t = min(1.0, elapsed / duration)
+                t_smooth = 3 * t**2 - 2 * t**3
+                
+                # Calculate current positions
+                current_positions = []
+                for j in range(3):
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Update joint state
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                
+                # Update GUI sliders (thread-safe)
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_reset_trajectory, current_positions)
+                
+                time.sleep(0.02)  # 50Hz update rate
+            
+            # Ensure final position is set
+            if self.trajectory_active:
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
+                
+                # Update GUI to final position
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_reset_trajectory, target_joints)
+                    self.root.after(0, self.reset_trajectory_completed)
+            
+        except Exception as e:
+            if hasattr(self, 'root') and self.root.winfo_exists():
+                self.root.after(0, self.reset_trajectory_error, str(e))
+        finally:
+            self.trajectory_active = False
+            
+    def update_gui_during_reset_trajectory(self, joint_positions):
+        """Update GUI sliders during reset trajectory execution (called from main thread)"""
+        try:
+            # Update sliders
+            self.bearing_var.set(joint_positions[0])
+            self.servo_lower_var.set(joint_positions[1])
+            self.servo_upper_var.set(joint_positions[2])
+            
+            # Update labels
+            self.bearing_label.config(text=f"{joint_positions[0]:.3f}")
+            self.servo_lower_label.config(text=f"{joint_positions[1]:.3f}")
+            self.servo_upper_label.config(text=f"{joint_positions[2]:.3f}")
+            
+        except Exception as e:
+            pass  # Ignore GUI update errors during trajectory
+            
+    def reset_trajectory_completed(self):
+        """Handle reset trajectory completion (called from main thread)"""
+        # Also reset camera tilt to 0
+        self.camera_tilt_var.set(0.0)
+        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
+        self.camera_tilt_label.config(text="0.000 rad (0.0°)")
+        
+        self.error_text.insert(tk.END, f"Reset trajectory completed successfully!\n")
+        self.error_text.insert(tk.END, f"Arm and camera reset to home position\n\n")
+        self.error_text.see(tk.END)
+        self.update_status("Reset trajectory completed - Arm and camera at home position")
+        
+    def reset_trajectory_error(self, error_msg):
+        """Handle reset trajectory error (called from main thread)"""
+        self.error_text.insert(tk.END, f"Reset trajectory error: {error_msg}\n")
+        self.error_text.see(tk.END)
+        self.update_status(f"Reset trajectory error: {error_msg}")
+        
+    def execute_gripper_trajectory(self, start_joints, target_joints, duration):
+        """Execute smooth trajectory for gripper joints"""
+        try:
+            # Calculate number of steps (50 steps per second for smooth motion)
+            steps = max(10, int(duration * 50))
+            dt = duration / steps
+            
+            # Create trajectory points
+            trajectory_points = []
+            
+            for i in range(steps + 1):
+                # Calculate interpolation factor (0 to 1)
+                t = i / steps
+                
+                # Smooth interpolation using cubic easing
+                t_smooth = 3 * t**2 - 2 * t**3  # Smooth start and end
+                
+                # Interpolate joint positions
+                current_positions = []
+                for j in range(4):  # 4 gripper joints
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Create trajectory point
+                point = JointTrajectoryPoint()
+                point.positions = current_positions
+                point.time_from_start = Duration(sec=int(t * duration), nanosec=int(((t * duration) % 1) * 1e9))
+                
+                trajectory_points.append(point)
+            
+            # Create and publish trajectory
+            traj = JointTrajectory()
+            traj.joint_names = ['revolute_GRIPPER_L1', 'revolute_GRIPPER_L2', 'Revolute_GRIPPER_R1', 'Revolute_GRIPPER_R2']
+            traj.points = trajectory_points
+            
+            # Publish trajectory
+            self.trajectory_pub.publish(traj)
+            
+            # Update GUI in real-time during trajectory execution
+            start_time = time.time()
+            while time.time() - start_time < duration and self.trajectory_active:
+                elapsed = time.time() - start_time
+                t = min(1.0, elapsed / duration)
+                t_smooth = 3 * t**2 - 2 * t**3
+                
+                # Calculate current positions
+                current_positions = []
+                for j in range(4):
+                    pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                    current_positions.append(pos)
+                
+                # Update joint state
+                self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
+                self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
+                self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
+                self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
+                
+                # Update GUI sliders (thread-safe)
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gripper_gui_during_trajectory, current_positions)
+                
+                time.sleep(0.02)  # 50Hz update rate
+            
+            # Ensure final position is set
+            if self.trajectory_active:
+                self.joint_state.position[self.gripper_joint_indices['L1']] = target_joints[0]
+                self.joint_state.position[self.gripper_joint_indices['L2']] = target_joints[1]
+                self.joint_state.position[self.gripper_joint_indices['R1']] = target_joints[2]
+                self.joint_state.position[self.gripper_joint_indices['R2']] = target_joints[3]
+                
+                # Update GUI to final position
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gripper_gui_during_trajectory, target_joints)
+                    self.root.after(0, self.gripper_trajectory_completed)
+            
+        except Exception as e:
+            if hasattr(self, 'root') and self.root.winfo_exists():
+                self.root.after(0, self.gripper_trajectory_error, str(e))
+        finally:
+            self.trajectory_active = False
+            
+    def update_gripper_gui_during_trajectory(self, joint_positions):
+        """Update gripper GUI sliders during trajectory execution (called from main thread)"""
+        try:
+            # Update sliders with proper mappings
+            l1_pos = joint_positions[0]
+            l2_pos = joint_positions[1]
+            r1_pos = joint_positions[2]
+            r2_pos = joint_positions[3]
+            
+            # Update simple sliders (left and right)
+            self.simple_left_var.set(l1_pos)  # L1 and L2 move together
+            self.simple_right_var.set(r1_pos)  # R1 and R2 move together (R2 is inverted)
+            
+            # Update joint state
+            self.joint_state.position[self.gripper_joint_indices['L1']] = l1_pos
+            self.joint_state.position[self.gripper_joint_indices['L2']] = l2_pos
+            self.joint_state.position[self.gripper_joint_indices['R1']] = r1_pos
+            self.joint_state.position[self.gripper_joint_indices['R2']] = r2_pos
+            
+            # Update labels
+            status_left = "Open" if l1_pos < -0.1 else "Closed"
+            status_right = "Open" if r1_pos > 0.1 else "Closed"
+            self.simple_left_label.config(text=f"{l1_pos:.3f} ({status_left})")
+            self.simple_right_label.config(text=f"{r1_pos:.3f} ({status_right})")
+            
+        except Exception as e:
+            pass  # Ignore GUI update errors during trajectory
+            
+    def gripper_trajectory_completed(self):
+        """Handle gripper trajectory completion (called from main thread)"""
+        self.gripper_status_text.insert(tk.END, f"Gripper trajectory completed successfully!\n\n")
+        self.gripper_status_text.see(tk.END)
+        self.update_status("Gripper trajectory completed")
+        
+    def gripper_trajectory_error(self, error_msg):
+        """Handle gripper trajectory error (called from main thread)"""
+        self.gripper_status_text.insert(tk.END, f"Gripper trajectory error: {error_msg}\n")
+        self.gripper_status_text.see(tk.END)
+        self.update_status(f"Gripper trajectory error: {error_msg}")
         
     def stop_trajectory(self):
         """Stop current trajectory execution"""
@@ -913,89 +1207,163 @@ class JETANKGripperControlGUI(Node):
             self.right_r2_label.config(text=f"{r2_pos:.3f}")
         self.update_status(f"Right side: {pos:.3f}")
         
-    def simple_open_gripper(self):
-        """Open gripper using simple controls"""
-        # Set left slider to open position
-        self.simple_left_var.set(-0.785)
-        # Set right slider to open position  
-        self.simple_right_var.set(0.785)
-        
-        # Update joint positions with proper mappings
-        self.joint_state.position[self.gripper_joint_indices['L1']] = -0.785  # L1
-        self.joint_state.position[self.gripper_joint_indices['L2']] = -0.785  # L2
-        self.joint_state.position[self.gripper_joint_indices['R1']] = 0.785   # R1 (direct mapping)
-        self.joint_state.position[self.gripper_joint_indices['R2']] = -0.785  # R2 (inverted mapping from 0.785)
-        
-        # Update individual tab sliders if they exist
-        if hasattr(self, 'left_l1_var'):
-            self.left_l1_var.set(-0.785)
-            self.left_l2_var.set(-0.785)
-            self.right_r1_var.set(0.785)
-            self.right_r2_var.set(-0.785)
-            
-        # Update labels
-        self.simple_left_label.config(text="-0.785 (Open)")
-        self.simple_right_label.config(text="0.785 (Open)")
-        
-        self.update_status("Gripper opened (simple control)")
-        
-    def simple_close_gripper(self):
-        """Close gripper using simple controls"""
-        # Set both sliders to closed position
-        self.simple_left_var.set(0.0)
-        self.simple_right_var.set(0.0)
-        
-        # Update joint positions
-        self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0  # L1
-        self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0  # L2
-        self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0  # R1
-        self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0  # R2
-        
-        # Update individual tab sliders if they exist
-        if hasattr(self, 'left_l1_var'):
-            self.left_l1_var.set(0.0)
-            self.left_l2_var.set(0.0)
-            self.right_r1_var.set(0.0)
-            self.right_r2_var.set(0.0)
-            
-        # Update labels
-        self.simple_left_label.config(text="0.000 (Closed)")
-        self.simple_right_label.config(text="0.000 (Closed)")
-        
-        self.update_status("Gripper closed (simple control)")
-        
     def open_gripper(self):
-        """Open gripper (move to open position)"""
-        # Left gripper: move to more negative values (open)
-        self.left_l1_var.set(-0.5)
-        self.left_l2_var.set(-0.5)
-        # Right gripper: move to more positive values (open)
-        self.right_r1_var.set(0.5)
-        self.right_r2_var.set(-0.5)
-        
-        # Update joint positions (only gripper joints, keep others at 0.0)
-        self.joint_state.position[self.gripper_joint_indices['L1']] = -0.5
-        self.joint_state.position[self.gripper_joint_indices['L2']] = -0.5
-        self.joint_state.position[self.gripper_joint_indices['R1']] = 0.5
-        self.joint_state.position[self.gripper_joint_indices['R2']] = -0.5
-        
-        # Update labels
-        self.left_l1_label.config(text="-0.500")
-        self.left_l2_label.config(text="-0.500")
-        self.right_r1_label.config(text="0.500")
-        self.right_r2_label.config(text="-0.500")
-        
-        self.update_status("Gripper opened")
+        """Open gripper using simple controls"""
+        # Check if gripper trajectory is enabled
+        if self.use_gripper_trajectory_var.get():
+            # Use trajectory movement
+            try:
+                duration = float(self.gripper_duration_var.get())
+                
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.gripper_status_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.gripper_status_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
+                
+                # Get current gripper joint positions
+                current_gripper_joints = [
+                    self.joint_state.position[self.gripper_joint_indices['L1']],
+                    self.joint_state.position[self.gripper_joint_indices['L2']],
+                    self.joint_state.position[self.gripper_joint_indices['R1']],
+                    self.joint_state.position[self.gripper_joint_indices['R2']]
+                ]
+                
+                # Target gripper joint positions (open)
+                target_gripper_joints = [-0.785, -0.785, 0.785, -0.785]
+                
+                # Start gripper trajectory execution in separate thread
+                self.trajectory_active = True
+                self.trajectory_thread = threading.Thread(
+                    target=self.execute_gripper_trajectory, 
+                    args=(current_gripper_joints, target_gripper_joints, duration),
+                    daemon=True
+                )
+                self.trajectory_thread.start()
+                
+                self.gripper_status_text.insert(tk.END, f"Gripper open trajectory started:\n")
+                self.gripper_status_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status(f"Executing gripper open trajectory")
+                
+            except ValueError:
+                self.gripper_status_text.insert(tk.END, "Error: Please enter valid numeric value for gripper duration\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status("Error: Invalid gripper duration")
+            except Exception as e:
+                self.gripper_status_text.insert(tk.END, f"Error: {str(e)}\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status(f"Error: {str(e)}")
+        else:
+            # Use instant movement
+            # Set left slider to open position
+            self.simple_left_var.set(-0.785)
+            # Set right slider to open position  
+            self.simple_right_var.set(0.785)
+            
+            # Update joint positions with proper mappings
+            self.joint_state.position[self.gripper_joint_indices['L1']] = -0.785  # L1
+            self.joint_state.position[self.gripper_joint_indices['L2']] = -0.785  # L2
+            self.joint_state.position[self.gripper_joint_indices['R1']] = 0.785   # R1 (direct mapping)
+            self.joint_state.position[self.gripper_joint_indices['R2']] = -0.785  # R2 (inverted mapping from 0.785)
+            
+            # Update individual tab sliders if they exist
+            if hasattr(self, 'left_l1_var'):
+                self.left_l1_var.set(-0.785)
+                self.left_l2_var.set(-0.785)
+                self.right_r1_var.set(0.785)
+                self.right_r2_var.set(-0.785)
+                
+            # Update labels
+            self.simple_left_label.config(text="-0.785 (Open)")
+            self.simple_right_label.config(text="0.785 (Open)")
+            
+            self.update_status("Gripper opened (simple control)")
         
     def close_gripper(self):
-        """Close gripper (move to closed position)"""
-        # Move all joints to closed position
+        """Close gripper using simple controls"""
+        # Check if gripper trajectory is enabled
+        if self.use_gripper_trajectory_var.get():
+            # Use trajectory movement
+            try:
+                duration = float(self.gripper_duration_var.get())
+                
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.gripper_status_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.gripper_status_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
+                
+                # Get current gripper joint positions
+                current_gripper_joints = [
+                    self.joint_state.position[self.gripper_joint_indices['L1']],
+                    self.joint_state.position[self.gripper_joint_indices['L2']],
+                    self.joint_state.position[self.gripper_joint_indices['R1']],
+                    self.joint_state.position[self.gripper_joint_indices['R2']]
+                ]
+                
+                # Target gripper joint positions (closed)
+                target_gripper_joints = [0.0, 0.0, 0.0, 0.0]
+                
+                # Start gripper trajectory execution in separate thread
+                self.trajectory_active = True
+                self.trajectory_thread = threading.Thread(
+                    target=self.execute_gripper_trajectory, 
+                    args=(current_gripper_joints, target_gripper_joints, duration),
+                    daemon=True
+                )
+                self.trajectory_thread.start()
+                
+                self.gripper_status_text.insert(tk.END, f"Gripper close trajectory started:\n")
+                self.gripper_status_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status(f"Executing gripper close trajectory")
+                
+            except ValueError:
+                self.gripper_status_text.insert(tk.END, "Error: Please enter valid numeric value for gripper duration\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status("Error: Invalid gripper duration")
+            except Exception as e:
+                self.gripper_status_text.insert(tk.END, f"Error: {str(e)}\n")
+                self.gripper_status_text.see(tk.END)
+                self.update_status(f"Error: {str(e)}")
+        else:
+            # Use instant movement
+            # Set both sliders to closed position
+            self.simple_left_var.set(0.0)
+            self.simple_right_var.set(0.0)
+            
+            # Update joint positions
+            self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0  # L1
+            self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0  # L2
+            self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0  # R1
+            self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0  # R2
+            
+            # Update individual tab sliders if they exist
+            if hasattr(self, 'left_l1_var'):
+                self.left_l1_var.set(0.0)
+                self.left_l2_var.set(0.0)
+                self.right_r1_var.set(0.0)
+                self.right_r2_var.set(0.0)
+                
+            # Update labels
+            self.simple_left_label.config(text="0.000 (Closed)")
+            self.simple_right_label.config(text="0.000 (Closed)")
+            
+            self.update_status("Gripper closed (simple control)")
+        
+        
+    def reset_gripper(self):
+        """Reset gripper and arm to default position"""
+        # Reset gripper joints to closed position
         self.left_l1_var.set(0.0)
         self.left_l2_var.set(0.0)
         self.right_r1_var.set(0.0)
         self.right_r2_var.set(0.0)
         
-        # Update joint positions (only gripper joints, keep others at 0.0)
+        # Update joint positions
         self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0
         self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0
         self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0
@@ -1006,12 +1374,6 @@ class JETANKGripperControlGUI(Node):
         self.left_l2_label.config(text="0.000")
         self.right_r1_label.config(text="0.000")
         self.right_r2_label.config(text="0.000")
-        
-        self.update_status("Gripper closed")
-        
-    def reset_gripper(self):
-        """Reset gripper and arm to default position"""
-        self.close_gripper()
         
         # Reset arm joints
         self.bearing_var.set(0.0)
