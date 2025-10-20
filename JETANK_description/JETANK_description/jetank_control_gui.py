@@ -6,6 +6,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from std_msgs.msg import Float64MultiArray
+from max_camera_msgs.msg import ObjectPoseArray, ObjectPose
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -47,6 +48,18 @@ class JETANKGripperControlGUI(Node):
         
         # Create velocity controller publisher
         self.velocity_pub = self.create_publisher(Float64MultiArray, '/forward_velocity_controller/commands', 10)
+        
+        # Object detection data
+        self.objects_data = {}  # Store latest objects data
+        self.objects_lock = threading.Lock()  # Thread safety for objects data
+        
+        # Create subscriber for object poses
+        self.objects_sub = self.create_subscription(
+            ObjectPoseArray,
+            '/objects_poses',
+            self.objects_callback,
+            10
+        )
         
         # Initialize joint state message with all JETANK revolute joints
         self.joint_state = JointState()
@@ -265,9 +278,13 @@ class JETANKGripperControlGUI(Node):
                                font=('Arial', 14, 'bold'))
         title_label.pack(pady=(0, 20))
         
-        # Coordinate input frame
-        coord_frame = ttk.LabelFrame(arm_control_frame, text="Target Position", padding="10")
-        coord_frame.pack(fill=tk.X, pady=5)
+        # Main control frame with side-by-side layout
+        main_control_frame = ttk.Frame(arm_control_frame)
+        main_control_frame.pack(fill=tk.X, pady=5)
+        
+        # Coordinate input frame (left side)
+        coord_frame = ttk.LabelFrame(main_control_frame, text="Target Position", padding="10")
+        coord_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
         # X coordinate
         x_frame = ttk.Frame(coord_frame)
@@ -295,6 +312,34 @@ class JETANKGripperControlGUI(Node):
         self.z_entry = ttk.Entry(z_frame, textvariable=self.z_var, width=15)
         self.z_entry.pack(side=tk.LEFT, padx=(5, 0))
         ttk.Label(z_frame, text="mm").pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Target Object frame (right side)
+        object_frame = ttk.LabelFrame(main_control_frame, text="Target Object", padding="10")
+        object_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Topic name input
+        topic_frame = ttk.Frame(object_frame)
+        topic_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(topic_frame, text="Topic:", width=8).pack(side=tk.LEFT)
+        self.topic_var = tk.StringVar(value="/objects_poses")
+        self.topic_entry = ttk.Entry(topic_frame, textvariable=self.topic_var, width=20)
+        self.topic_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Object name input
+        object_name_frame = ttk.Frame(object_frame)
+        object_name_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(object_name_frame, text="Object:", width=8).pack(side=tk.LEFT)
+        self.object_name_var = tk.StringVar(value="red object_0")
+        self.object_name_entry = ttk.Entry(object_name_frame, textvariable=self.object_name_var, width=20)
+        self.object_name_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Move to object button
+        object_button_frame = ttk.Frame(object_frame)
+        object_button_frame.pack(fill=tk.X, pady=5)
+        ttk.Button(object_button_frame, text="Move to Grab", 
+                  command=self.move_to_object).pack(side=tk.LEFT, padx=5)
+        ttk.Button(object_button_frame, text="Refresh Objects", 
+                  command=self.refresh_objects).pack(side=tk.LEFT, padx=5)
         
         # Trajectory control
         trajectory_frame = ttk.Frame(arm_control_frame)
@@ -341,6 +386,10 @@ class JETANKGripperControlGUI(Node):
         self.error_text.insert(tk.END, "Enter target coordinates (in mm) and click 'Move to Position'\n")
         self.error_text.insert(tk.END, "Click 'Reset Position' to return to home position\n")
         self.error_text.insert(tk.END, "Inverse Kinematics will calculate the required joint angles\n\n")
+        self.error_text.insert(tk.END, "Target Object:\n")
+        self.error_text.insert(tk.END, "  Enter object name and click 'Move to Grab' to move to detected object\n")
+        self.error_text.insert(tk.END, "  Click 'Refresh Objects' to see available objects\n")
+        self.error_text.insert(tk.END, "  Object positions are automatically converted from meters to mm\n\n")
         self.error_text.insert(tk.END, "Workspace limits (approximate):\n")
         self.error_text.insert(tk.END, "  X: -200 to 200 mm\n")
         self.error_text.insert(tk.END, "  Y: -200 to 200 mm\n")
@@ -1523,6 +1572,90 @@ class JETANKGripperControlGUI(Node):
         self.motion_status_text.see(tk.END)
         self.update_status("Stopped")
         
+    def objects_callback(self, msg):
+        """Callback for objects_poses topic"""
+        with self.objects_lock:
+            # Store the latest objects data
+            self.objects_data = {}
+            for obj in msg.objects:
+                self.objects_data[obj.object_name] = {
+                    'position': [obj.pose.position.x, obj.pose.position.y, obj.pose.position.z],
+                    'orientation': [obj.pose.orientation.x, obj.pose.orientation.y, obj.pose.orientation.z, obj.pose.orientation.w],
+                    'roll': obj.roll,
+                    'pitch': obj.pitch,
+                    'yaw': obj.yaw,
+                    'header': obj.header
+                }
+    
+    def get_object_position(self, object_name):
+        """Get position of a specific object by name"""
+        with self.objects_lock:
+            if object_name in self.objects_data:
+                return self.objects_data[object_name]['position']
+            return None
+    
+    def list_available_objects(self):
+        """Get list of available object names"""
+        with self.objects_lock:
+            return list(self.objects_data.keys())
+    
+    def move_to_object(self):
+        """Move arm to detected object position"""
+        try:
+            object_name = self.object_name_var.get()
+            
+            # Get object position
+            position = self.get_object_position(object_name)
+            
+            if position is None:
+                self.error_text.insert(tk.END, f"Error: Object '{object_name}' not found\n")
+                self.error_text.insert(tk.END, f"Available objects: {', '.join(self.list_available_objects())}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Object '{object_name}' not found")
+                return
+            
+            # Convert from meters to millimeters
+            x_mm = position[0] * 1000
+            y_mm = position[1] * 1000
+            z_mm = position[2] * 1000
+            
+            # Update coordinate fields
+            self.x_var.set(f"{x_mm:.1f}")
+            self.y_var.set(f"{y_mm:.1f}")
+            self.z_var.set(f"{z_mm:.1f}")
+            
+            # Use existing move_to_position function
+            self.error_text.insert(tk.END, f"Moving to object '{object_name}' at position: X={x_mm:.1f}mm, Y={y_mm:.1f}mm, Z={z_mm:.1f}mm\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Moving to object '{object_name}'")
+            
+            # Call the existing move_to_position function
+            self.move_to_position()
+            
+        except Exception as e:
+            self.error_text.insert(tk.END, f"Error moving to object: {str(e)}\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Error: {str(e)}")
+    
+    def refresh_objects(self):
+        """Refresh and display available objects"""
+        try:
+            available_objects = self.list_available_objects()
+            
+            if available_objects:
+                self.error_text.insert(tk.END, f"Available objects: {', '.join(available_objects)}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Found {len(available_objects)} objects")
+            else:
+                self.error_text.insert(tk.END, "No objects detected. Make sure the object detection system is running.\n")
+                self.error_text.see(tk.END)
+                self.update_status("No objects detected")
+                
+        except Exception as e:
+            self.error_text.insert(tk.END, f"Error refreshing objects: {str(e)}\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Error: {str(e)}")
+    
     def update_status(self, message):
         """Update status label"""
         if hasattr(self, 'status_label'):
