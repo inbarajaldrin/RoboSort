@@ -5,6 +5,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
+from std_msgs.msg import Float64MultiArray
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -43,6 +44,9 @@ class JETANKGripperControlGUI(Node):
         
         # Create trajectory publisher
         self.trajectory_pub = self.create_publisher(JointTrajectory, 'arm_trajectory', 10)
+        
+        # Create velocity controller publisher
+        self.velocity_pub = self.create_publisher(Float64MultiArray, '/forward_velocity_controller/commands', 10)
         
         # Initialize joint state message with all JETANK revolute joints
         self.joint_state = JointState()
@@ -135,6 +139,9 @@ class JETANKGripperControlGUI(Node):
         
         # Create Gripper Control Tab
         self.create_gripper_control_tab()
+        
+        # Create Motion Control Tab
+        self.create_motion_control_tab()
         
         # Status label
         self.status_label = ttk.Label(main_frame, text="Ready", 
@@ -411,6 +418,80 @@ class JETANKGripperControlGUI(Node):
         
         # Initialize with welcome message
         self.gripper_status_text.insert(tk.END, "Gripper Control Ready\nUse the sliders or buttons to control the gripper\n")
+        
+    def create_motion_control_tab(self):
+        """Create the motion control tab"""
+        motion_frame = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(motion_frame, text="Motion Control")
+        
+        # Title
+        title_label = ttk.Label(motion_frame, text="Robot Motion Control", 
+                               font=('Arial', 14, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # Motion control frame
+        control_frame = ttk.LabelFrame(motion_frame, text="Movement Commands", padding="10")
+        control_frame.pack(fill=tk.X, pady=5)
+        
+        # Create button grid
+        button_frame = ttk.Frame(control_frame)
+        button_frame.pack(expand=True)
+        
+        # Forward button
+        self.forward_btn = ttk.Button(button_frame, text="Forward", 
+                                     command=self.move_forward,
+                                     style="Accent.TButton")
+        self.forward_btn.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+        
+        # Left button
+        self.left_btn = ttk.Button(button_frame, text="Left", 
+                                  command=self.move_left)
+        self.left_btn.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
+        
+        # Stop button
+        self.stop_btn = ttk.Button(button_frame, text="STOP", 
+                                   command=self.stop_motion,
+                                   style="Accent.TButton")
+        self.stop_btn.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+        
+        # Right button
+        self.right_btn = ttk.Button(button_frame, text="Right", 
+                                   command=self.move_right)
+        self.right_btn.grid(row=1, column=2, padx=5, pady=5, sticky="nsew")
+        
+        # Backward button
+        self.backward_btn = ttk.Button(button_frame, text="Backward", 
+                                       command=self.move_backward,
+                                       style="Accent.TButton")
+        self.backward_btn.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
+        
+        # Configure grid weights for proper button sizing
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        button_frame.columnconfigure(2, weight=1)
+        button_frame.rowconfigure(0, weight=1)
+        button_frame.rowconfigure(1, weight=1)
+        button_frame.rowconfigure(2, weight=1)
+        
+        # Status text box for motion control
+        motion_status_frame = ttk.LabelFrame(motion_frame, text="Motion Status", padding="10")
+        motion_status_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        self.motion_status_text = tk.Text(motion_status_frame, height=6, width=50, wrap=tk.WORD)
+        motion_scrollbar = ttk.Scrollbar(motion_status_frame, orient=tk.VERTICAL, command=self.motion_status_text.yview)
+        self.motion_status_text.configure(yscrollcommand=motion_scrollbar.set)
+        
+        self.motion_status_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        motion_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Initialize with welcome message
+        self.motion_status_text.insert(tk.END, "Motion Control Ready\n")
+        self.motion_status_text.insert(tk.END, "Use the buttons to control robot movement:\n")
+        self.motion_status_text.insert(tk.END, "• Forward: Move forward\n")
+        self.motion_status_text.insert(tk.END, "• Backward: Move backward\n")
+        self.motion_status_text.insert(tk.END, "• Left: Turn left\n")
+        self.motion_status_text.insert(tk.END, "• Right: Turn right\n")
+        self.motion_status_text.insert(tk.END, "• STOP: Stop all movement\n")
         
     def on_closing(self):
         """Handle window closing"""
@@ -1396,6 +1477,51 @@ class JETANKGripperControlGUI(Node):
         self.camera_tilt_label.config(text="0.000 rad (0.0°)")
         
         self.update_status("Gripper, arm, and camera reset")
+        
+    def move_forward(self):
+        """Send forward motion command"""
+        msg = Float64MultiArray()
+        msg.data = [-5.0, 5.0, -5.0, 5.0]
+        self.velocity_pub.publish(msg)
+        self.motion_status_text.insert(tk.END, "Forward command sent: [-5.0, 5.0, -5.0, 5.0]\n")
+        self.motion_status_text.see(tk.END)
+        self.update_status("Moving forward")
+        
+    def move_backward(self):
+        """Send backward motion command"""
+        msg = Float64MultiArray()
+        msg.data = [5.0, -5.0, 5.0, -5.0]
+        self.velocity_pub.publish(msg)
+        self.motion_status_text.insert(tk.END, "Backward command sent: [5.0, -5.0, 5.0, -5.0]\n")
+        self.motion_status_text.see(tk.END)
+        self.update_status("Moving backward")
+        
+    def move_left(self):
+        """Send left turn command"""
+        msg = Float64MultiArray()
+        msg.data = [5.0, 5.0, 5.0, 5.0]
+        self.velocity_pub.publish(msg)
+        self.motion_status_text.insert(tk.END, "Left turn command sent: [5.0, 5.0, 5.0, 5.0]\n")
+        self.motion_status_text.see(tk.END)
+        self.update_status("Turning left")
+        
+    def move_right(self):
+        """Send right turn command"""
+        msg = Float64MultiArray()
+        msg.data = [-5.0, -5.0, -5.0, -5.0]
+        self.velocity_pub.publish(msg)
+        self.motion_status_text.insert(tk.END, "Right turn command sent: [-5.0, -5.0, -5.0, -5.0]\n")
+        self.motion_status_text.see(tk.END)
+        self.update_status("Turning right")
+        
+    def stop_motion(self):
+        """Send stop motion command"""
+        msg = Float64MultiArray()
+        msg.data = [0.0, 0.0, 0.0, 0.0]
+        self.velocity_pub.publish(msg)
+        self.motion_status_text.insert(tk.END, "Stop command sent: [0.0, 0.0, 0.0, 0.0]\n")
+        self.motion_status_text.see(tk.END)
+        self.update_status("Stopped")
         
     def update_status(self, message):
         """Update status label"""
