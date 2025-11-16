@@ -754,14 +754,14 @@
     <parent link="GRIPPER_BASE_1"/>
     <child link="GRIPPER_L1_1"/>
     <axis xyz="-5e-06 -0.002097 0.999998"/>
-    <limit effort="100" lower="-0.785398" upper="0.0" velocity="100"/>
+    <limit effort="100" lower="-1.047198" upper="0.0" velocity="100"/>
   </joint>
   <joint name="revolute_GRIPPER_L2" type="revolute">
     <origin rpy="0 0 0" xyz="-0.029999 0.00011 -0.0001"/>
     <parent link="GRIPPER_L1_1"/>
     <child link="GRIPPER_L2_1"/>
     <axis xyz="5e-06 0.002097 -0.999998"/>
-    <limit effort="100" lower="-0.785398" upper="0.0" velocity="100"/>
+    <limit effort="100" lower="-1.047198" upper="0.0" velocity="100"/>
   </joint>
   <joint name="Revolute_SERVO_UPPER" type="revolute">
     <origin rpy="0 0 0" xyz="0.0 -0.000199 0.095"/>
@@ -801,14 +801,14 @@
     <parent link="GRIPPER_R1_1"/>
     <child link="GRIPPER_R2_1"/>
     <axis xyz="-5e-06 -0.002097 0.999998"/>
-    <limit effort="100" lower="-0.785398" upper="0.0" velocity="100"/>
+    <limit effort="100" lower="-1.047198" upper="0.0" velocity="100"/>
   </joint>
   <joint name="Revolute_GRIPPER_R1" type="revolute">
     <origin rpy="0 0 0" xyz="-0.044518 -0.004847 -0.00151"/>
     <parent link="GRIPPER_BASE_1"/>
     <child link="GRIPPER_R1_1"/>
     <axis xyz="-5e-06 -0.002097 0.999998"/>
-    <limit effort="100" lower="0.0" upper="0.785398" velocity="100"/>
+    <limit effort="100" lower="0.0" upper="1.047198" velocity="100"/>
   </joint>
   <joint name="rigid_GRIPPER_BASE_ARM_UPPER" type="fixed">
     <origin rpy="0 0 0" xyz="-0.042756 0.020334 -0.007477"/>
