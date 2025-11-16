@@ -19,21 +19,15 @@ import math
 import xml.etree.ElementTree as ET
 from ament_index_python.packages import get_package_share_directory
 
-# Add scripts directory to path and import IK functions
-scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
+# Import IK functions from share/scripts directory
+package_dir = get_package_share_directory('JETANK_description')
+scripts_path = os.path.join(package_dir, 'scripts')
 if scripts_path not in sys.path:
     sys.path.insert(0, scripts_path)
 
-# Also try the symlinked path in ros2_ws
-scripts_path_ws = '/home/aaugus11/ros2_ws/src/JETANK_description/scripts'
-if scripts_path_ws not in sys.path:
-    sys.path.insert(0, scripts_path_ws)
-
 try:
     from ik import compute_ik, forward_kinematics, verify_solution
-except ImportError as e:
-    print(f"Warning: Could not import IK functions: {e}")
-    print("IK functionality will be disabled.")
+except ImportError:
     compute_ik = None
     forward_kinematics = None
     verify_solution = None
