@@ -462,7 +462,7 @@
   <parent link="BEARING_1"/>
   <child link="ARM_LOWER_1"/>
   <axis xyz="-4e-06 -0.002097 0.999998"/>
-  <limit upper="1.5708" lower="-1.5708" effort="100" velocity="100"/>
+  <limit upper="1.8" lower="-1.8" effort="100" velocity="100"/>
 </joint>
 
 <joint name="revolute_FREE_WHEEL_LEFT" type="revolute">
@@ -492,7 +492,7 @@
   <parent link="ARM_LOWER_1"/>
   <child link="CAM_HOLDER_1"/>
   <axis xyz="0 1 0"/>
-  <limit upper="0.785398" lower="-0.785398" effort="100" velocity="100"/>
+  <limit upper="1.0" lower="-1.0" effort="100" velocity="100"/>
 </joint>
 
 <joint name="revolute_GRIPPER_L1" type="revolute">
@@ -516,7 +516,7 @@
   <parent link="ARM_MIDDLE_2"/>
   <child link="SERVO_UPPER_1"/>
   <axis xyz="-0.003633 -0.999991 -0.002097"/>
-  <limit upper="0.785594" lower="-3.1418" effort="100" velocity="100"/>
+  <limit upper="1.0" lower="-1.548620" effort="100" velocity="100"/>
 </joint>
 
 <joint name="Revolute_SERVO_LOWER" type="revolute">
@@ -524,7 +524,7 @@
   <parent link="SERVO_LOWER_1"/>
   <child link="ARM_MIDDLE_2"/>
   <axis xyz="-0.003633 -0.999991 -0.002097"/>
-  <limit upper="1.570796" lower="0.0" effort="100" velocity="100"/>
+  <limit upper="1.574492" lower="-1.892348" effort="100" velocity="100"/>
 </joint>
 
 <joint name="Rigid_SERVO_LOWER_ARM_LOWER" type="fixed">
