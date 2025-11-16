@@ -73,14 +73,14 @@ class JETANKGripperControlGUI(Node):
             'revolute_BEARING',                  # Arm base rotation: -1.5708 to 1.5708
             'revolute_FREE_WHEEL_LEFT',          # Left free wheel: 0.0 to 6.283185
             'revolute_FREE_WHEEL_RIGHT',         # Right free wheel: 0.0 to 6.283185
-            'revolute_GRIPPER_L1',               # Left gripper L1: -0.785398 to 0.0
-            'revolute_GRIPPER_L2',               # Left gripper L2: -0.785398 to 0.0
+            'revolute_GRIPPER_L1',               # Left gripper L1: limits from URDF
+            'revolute_GRIPPER_L2',               # Left gripper L2: limits from URDF
             'Revolute_SERVO_UPPER',              # Upper arm servo: -3.1418 to 0.785594
             'Revolute_SERVO_LOWER',              # Lower arm servo: 0.0 to 1.570796
             'Revolute_DRIVING_WHEEL_R',          # Right driving wheel: 0.0 to 6.283185
             'Revolute_DRIVING_WHEEL_L',          # Left driving wheel: 0.0 to 6.283185
-            'Revolute_GRIPPER_R2',               # Right gripper R2: -0.785398 to 0.0
-            'Revolute_GRIPPER_R1',               # Right gripper R1: 0.0 to 0.785398
+            'Revolute_GRIPPER_R2',               # Right gripper R2: limits from URDF
+            'Revolute_GRIPPER_R1',               # Right gripper R1: limits from URDF
             'revolute_CAMERA_HOLDER_ARM_LOWER'   # Camera tilt: -0.785398 to 0.785398 (±45 degrees)
         ]
         # Initialize all joints to default positions (0.0 for most, except wheels which can be 0.0)
@@ -179,10 +179,10 @@ class JETANKGripperControlGUI(Node):
             'Revolute_SERVO_LOWER': {'lower': -1.892348, 'upper': 1.574492},
             'Revolute_SERVO_UPPER': {'lower': -1.548620, 'upper': 1.0},
             'revolute_CAMERA_HOLDER_ARM_LOWER': {'lower': -1.0, 'upper': 1.0},
-            'revolute_GRIPPER_L1': {'lower': -0.785398, 'upper': 0.0},
-            'revolute_GRIPPER_L2': {'lower': -0.785398, 'upper': 0.0},
-            'Revolute_GRIPPER_R1': {'lower': 0.0, 'upper': 0.785398},
-            'Revolute_GRIPPER_R2': {'lower': -0.785398, 'upper': 0.0},
+            'revolute_GRIPPER_L1': {'lower': -1.047198, 'upper': 0.0},
+            'revolute_GRIPPER_L2': {'lower': -1.047198, 'upper': 0.0},
+            'Revolute_GRIPPER_R1': {'lower': 0.0, 'upper': 1.047198},
+            'Revolute_GRIPPER_R2': {'lower': -1.047198, 'upper': 0.0},
         }
     
     def get_joint_limit(self, joint_name, limit_type='lower'):
@@ -494,35 +494,23 @@ class JETANKGripperControlGUI(Node):
         gripper_frame = ttk.Frame(self.notebook, padding="10")
         self.notebook.add(gripper_frame, text="Gripper Control")
         
-        # Left Side Control
-        left_simple_frame = ttk.LabelFrame(gripper_frame, text="Left Side", padding="10")
-        left_simple_frame.pack(fill=tk.X, pady=5)
+        # Unified Gripper Control
+        gripper_control_frame = ttk.LabelFrame(gripper_frame, text="Gripper Control", padding="10")
+        gripper_control_frame.pack(fill=tk.X, pady=5)
         
-        ttk.Label(left_simple_frame, text="Left Gripper:").pack(anchor=tk.W)
-        self.simple_left_var = tk.DoubleVar(value=0.0)
-        simple_left_lower = self.get_joint_limit('revolute_GRIPPER_L1', 'lower')
-        simple_left_upper = self.get_joint_limit('revolute_GRIPPER_L1', 'upper')
-        self.simple_left_scale = ttk.Scale(left_simple_frame, from_=simple_left_upper, to=simple_left_lower,
-                                          variable=self.simple_left_var, orient=tk.HORIZONTAL,
-                                          command=self.on_simple_left_change)
-        self.simple_left_scale.pack(fill=tk.X, pady=2)
-        self.simple_left_label = ttk.Label(left_simple_frame, text="0.000 (Closed)")
-        self.simple_left_label.pack(anchor=tk.W)
-        
-        # Right Side Control
-        right_simple_frame = ttk.LabelFrame(gripper_frame, text="Right Side", padding="10")
-        right_simple_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(right_simple_frame, text="Right Gripper:").pack(anchor=tk.W)
-        self.simple_right_var = tk.DoubleVar(value=0.0)
-        simple_right_lower = self.get_joint_limit('Revolute_GRIPPER_R1', 'lower')
-        simple_right_upper = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
-        self.simple_right_scale = ttk.Scale(right_simple_frame, from_=simple_right_lower, to=simple_right_upper,
-                                           variable=self.simple_right_var, orient=tk.HORIZONTAL,
-                                           command=self.on_simple_right_change)
-        self.simple_right_scale.pack(fill=tk.X, pady=2)
-        self.simple_right_label = ttk.Label(right_simple_frame, text="0.000 (Closed)")
-        self.simple_right_label.pack(anchor=tk.W)
+        ttk.Label(gripper_control_frame, text="Gripper:").pack(anchor=tk.W)
+        self.gripper_var = tk.DoubleVar(value=0.0)
+        # Servo range: 0.0 (closed) to 1.22 (open)
+        # Get max joint angle from URDF dynamically (for R1, which goes 0 to max)
+        gripper_max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+        servo_max = 1.22
+        self.gripper_max_angle = gripper_max_angle  # Store for use in callback
+        self.gripper_scale = ttk.Scale(gripper_control_frame, from_=0.0, to=servo_max,
+                                       variable=self.gripper_var, orient=tk.HORIZONTAL,
+                                       command=self.on_gripper_change)
+        self.gripper_scale.pack(fill=tk.X, pady=2)
+        self.gripper_label = ttk.Label(gripper_control_frame, text="0.000 (Closed)")
+        self.gripper_label.pack(anchor=tk.W)
         
         # Gripper trajectory control
         gripper_trajectory_frame = ttk.Frame(gripper_frame)
@@ -1219,9 +1207,14 @@ class JETANKGripperControlGUI(Node):
             r1_pos = joint_positions[2]
             r2_pos = joint_positions[3]
             
-            # Update simple sliders (left and right)
-            self.simple_left_var.set(l1_pos)  # L1 and L2 move together
-            self.simple_right_var.set(r1_pos)  # R1 and R2 move together (R2 is inverted)
+            # Update unified gripper slider
+            # Convert joint angle back to servo value: joint_angle → servo_value
+            # joint_angle = (servo_value / 1.22) * max_angle, so servo_value = (joint_angle / max_angle) * 1.22
+            joint_angle = abs(r1_pos) if r1_pos >= 0 else abs(l1_pos)
+            max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+            servo_value = (joint_angle / max_angle) * 1.22 if joint_angle > 0 and max_angle > 0 else 0.0
+            if hasattr(self, 'gripper_var'):
+                self.gripper_var.set(servo_value)
             
             # Update joint state
             self.joint_state.position[self.gripper_joint_indices['L1']] = l1_pos
@@ -1229,11 +1222,10 @@ class JETANKGripperControlGUI(Node):
             self.joint_state.position[self.gripper_joint_indices['R1']] = r1_pos
             self.joint_state.position[self.gripper_joint_indices['R2']] = r2_pos
             
-            # Update labels
-            status_left = "Open" if l1_pos < -0.1 else "Closed"
-            status_right = "Open" if r1_pos > 0.1 else "Closed"
-            self.simple_left_label.config(text=f"{l1_pos:.3f} ({status_left})")
-            self.simple_right_label.config(text=f"{r1_pos:.3f} ({status_right})")
+            # Update unified gripper label (show servo value)
+            if hasattr(self, 'gripper_label'):
+                status = "Open" if servo_value > 0.1 else "Closed"
+                self.gripper_label.config(text=f"{servo_value:.3f} ({status})")
             
         except Exception as e:
             pass  # Ignore GUI update errors during trajectory
@@ -1392,48 +1384,47 @@ class JETANKGripperControlGUI(Node):
         self.joint_state.position[self.gripper_joint_indices['R2']] = pos
         self.update_status(f"Right R2: {pos:.3f}")
         
-    def on_simple_left_change(self, value):
-        """Handle simple left slider change (controls both L1 and L2)"""
-        pos = float(value)
-        # Map slider value to joint positions: L1 and L2 both move together
-        # Slider: 0.0 (closed) to -0.785 (open)
-        self.left_l1_var.set(pos)
-        self.left_l2_var.set(pos)
-        self.joint_state.position[self.gripper_joint_indices['L1']] = pos  # L1
-        self.joint_state.position[self.gripper_joint_indices['L2']] = pos  # L2
+    def on_gripper_change(self, value):
+        """Handle unified gripper slider change (controls both left and right grippers)"""
+        servo_value = float(value)
+        # Slider: 0.0 (closed) to 1.22 (open) - servo range
+        # Map servo value to joint angle: 0.0 → 0.0, 1.22 → max_angle (from URDF)
+        max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+        joint_angle = (servo_value / 1.22) * max_angle
         
-        # Update labels
-        status = "Open" if pos < -0.1 else "Closed"
-        self.simple_left_label.config(text=f"{pos:.3f} ({status})")
+        # Left gripper: map to negative (0.0 → 0.0, max_angle → -max_angle)
+        # Right gripper: map to positive (0.0 → 0.0, max_angle → max_angle)
+        
+        # Left side: both L1 and L2 get negative value
+        left_pos = -joint_angle
+        self.joint_state.position[self.gripper_joint_indices['L1']] = left_pos
+        self.joint_state.position[self.gripper_joint_indices['L2']] = left_pos
+        
+        # Right side: R1 gets positive value, R2 gets negative value
+        right_r1_pos = joint_angle
+        right_r2_pos = -joint_angle
+        self.joint_state.position[self.gripper_joint_indices['R1']] = right_r1_pos
+        self.joint_state.position[self.gripper_joint_indices['R2']] = right_r2_pos
+        
+        # Update individual sliders if they exist
+        if hasattr(self, 'left_l1_var'):
+            self.left_l1_var.set(left_pos)
+            self.left_l2_var.set(left_pos)
+        if hasattr(self, 'right_r1_var'):
+            self.right_r1_var.set(right_r1_pos)
+            self.right_r2_var.set(right_r2_pos)
+        
+        # Update labels - show servo value (0-1.22)
+        status = "Open" if servo_value > 0.1 else "Closed"
+        self.gripper_label.config(text=f"{servo_value:.3f} ({status})")
         if hasattr(self, 'left_l1_label'):
-            self.left_l1_label.config(text=f"{pos:.3f}")
-            self.left_l2_label.config(text=f"{pos:.3f}")
-        self.update_status(f"Left side: {pos:.3f}")
-        
-    def on_simple_right_change(self, value):
-        """Handle simple right slider change (controls both R1 and R2)"""
-        pos = float(value)
-        # Map slider value to joint positions according to your mapping:
-        # R1: 0 to 0, 0.785 to 0.785 (direct mapping)
-        # R2: 0 to 0, 0.785 to -0.785 (inverted mapping)
-        
-        # Calculate mapped positions
-        r1_pos = pos   # R1: direct mapping (0.785 → 0.785)
-        r2_pos = -pos  # R2: inverted mapping (0.785 → -0.785)
-        
-        self.right_r1_var.set(pos)      # R1 shows direct value
-        self.right_r2_var.set(r2_pos)   # R2 shows inverted value
-        
-        self.joint_state.position[self.gripper_joint_indices['R1']] = r1_pos  # R1 (direct)
-        self.joint_state.position[self.gripper_joint_indices['R2']] = r2_pos  # R2 (inverted)
-        
-        # Update labels
-        status = "Open" if pos > 0.1 else "Closed"
-        self.simple_right_label.config(text=f"{pos:.3f} ({status})")
+            self.left_l1_label.config(text=f"{left_pos:.3f}")
+            self.left_l2_label.config(text=f"{left_pos:.3f}")
         if hasattr(self, 'right_r1_label'):
-            self.right_r1_label.config(text=f"{r1_pos:.3f}")
-            self.right_r2_label.config(text=f"{r2_pos:.3f}")
-        self.update_status(f"Right side: {pos:.3f}")
+            self.right_r1_label.config(text=f"{right_r1_pos:.3f}")
+            self.right_r2_label.config(text=f"{right_r2_pos:.3f}")
+        
+        self.update_status(f"Gripper: {servo_value:.3f} ({status})")
         
     def open_gripper(self):
         """Open gripper using simple controls"""
@@ -1458,8 +1449,9 @@ class JETANKGripperControlGUI(Node):
                     self.joint_state.position[self.gripper_joint_indices['R2']]
                 ]
                 
-                # Target gripper joint positions (open)
-                target_gripper_joints = [-0.785, -0.785, 0.785, -0.785]
+                # Target gripper joint positions (open) - use dynamic limits from URDF
+                max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+                target_gripper_joints = [-max_angle, -max_angle, max_angle, -max_angle]
                 
                 # Start gripper trajectory execution in separate thread
                 self.trajectory_active = True
@@ -1485,27 +1477,33 @@ class JETANKGripperControlGUI(Node):
                 self.update_status(f"Error: {str(e)}")
         else:
             # Use instant movement
-            # Set left slider to open position
-            self.simple_left_var.set(-0.785)
-            # Set right slider to open position  
-            self.simple_right_var.set(0.785)
+            # Set unified gripper slider to open position (1.22 - servo max)
+            if hasattr(self, 'gripper_var'):
+                self.gripper_var.set(1.22)
             
-            # Update joint positions with proper mappings
-            self.joint_state.position[self.gripper_joint_indices['L1']] = -0.785  # L1
-            self.joint_state.position[self.gripper_joint_indices['L2']] = -0.785  # L2
-            self.joint_state.position[self.gripper_joint_indices['R1']] = 0.785   # R1 (direct mapping)
-            self.joint_state.position[self.gripper_joint_indices['R2']] = -0.785  # R2 (inverted mapping from 0.785)
+            # Update joint positions with proper mappings - use dynamic limits from URDF
+            max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+            self.joint_state.position[self.gripper_joint_indices['L1']] = -max_angle  # L1
+            self.joint_state.position[self.gripper_joint_indices['L2']] = -max_angle  # L2
+            self.joint_state.position[self.gripper_joint_indices['R1']] = max_angle   # R1 (direct mapping)
+            self.joint_state.position[self.gripper_joint_indices['R2']] = -max_angle  # R2 (inverted mapping)
+            
+            # Update gripper label
+            if hasattr(self, 'gripper_label'):
+                self.gripper_label.config(text="1.220 (Open)")
             
             # Update individual tab sliders if they exist
             if hasattr(self, 'left_l1_var'):
-                self.left_l1_var.set(-0.785)
-                self.left_l2_var.set(-0.785)
-                self.right_r1_var.set(0.785)
-                self.right_r2_var.set(-0.785)
+                self.left_l1_var.set(-max_angle)
+                self.left_l2_var.set(-max_angle)
+                self.right_r1_var.set(max_angle)
+                self.right_r2_var.set(-max_angle)
                 
             # Update labels
-            self.simple_left_label.config(text="-0.785 (Open)")
-            self.simple_right_label.config(text="0.785 (Open)")
+            if hasattr(self, 'simple_left_label'):
+                self.simple_left_label.config(text=f"{-max_angle:.3f} (Open)")
+            if hasattr(self, 'simple_right_label'):
+                self.simple_right_label.config(text=f"{max_angle:.3f} (Open)")
             
             self.update_status("Gripper opened (simple control)")
         
@@ -1559,14 +1557,18 @@ class JETANKGripperControlGUI(Node):
                 self.update_status(f"Error: {str(e)}")
         else:
             # Use instant movement
-            # Set both sliders to closed position
-            self.simple_left_var.set(0.0)
-            self.simple_right_var.set(0.0)
+            # Set unified gripper slider to closed position (0.0)
+            if hasattr(self, 'gripper_var'):
+                self.gripper_var.set(0.0)
             
             # Update joint positions
             self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0  # L1
             self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0  # L2
             self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0  # R1
+            
+            # Update gripper label
+            if hasattr(self, 'gripper_label'):
+                self.gripper_label.config(text="0.000 (Closed)")
             self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0  # R2
             
             # Update individual tab sliders if they exist
