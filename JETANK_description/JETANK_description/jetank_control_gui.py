@@ -16,6 +16,8 @@ import sys
 import os
 import numpy as np
 import math
+import xml.etree.ElementTree as ET
+from ament_index_python.packages import get_package_share_directory
 
 # Add scripts directory to path and import IK functions
 scripts_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts')
@@ -39,6 +41,9 @@ except ImportError as e:
 class JETANKGripperControlGUI(Node):
     def __init__(self):
         super().__init__('jetank_gripper_control_gui')
+        
+        # Load joint limits from URDF
+        self.joint_limits = self.load_joint_limits_from_urdf()
         
         # Create publisher for joint states
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
@@ -116,6 +121,79 @@ class JETANKGripperControlGUI(Node):
         self.timer = self.create_timer(0.1, self.publish_joint_states)
         
         self.get_logger().info('JETANK Gripper Control GUI initialized')
+    
+    def load_joint_limits_from_urdf(self):
+        """Load joint limits from URDF file dynamically"""
+        joint_limits = {}
+        
+        try:
+            # Try to get package share directory
+            try:
+                package_dir = get_package_share_directory('JETANK_description')
+                urdf_path = os.path.join(package_dir, 'urdf', 'JETANK.urdf')
+            except:
+                # Fallback: try relative path from current file
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                urdf_path = os.path.join(current_dir, '..', 'urdf', 'JETANK.urdf')
+                urdf_path = os.path.abspath(urdf_path)
+            
+            if not os.path.exists(urdf_path):
+                self.get_logger().warn(f'URDF file not found at {urdf_path}, using default limits')
+                return self.get_default_joint_limits()
+            
+            # Parse URDF XML
+            tree = ET.parse(urdf_path)
+            root = tree.getroot()
+            
+            # Find all joint elements
+            for joint in root.findall('joint'):
+                joint_name = joint.get('name')
+                if joint_name is None:
+                    continue
+                
+                # Find limit element
+                limit = joint.find('limit')
+                if limit is not None:
+                    lower = limit.get('lower')
+                    upper = limit.get('upper')
+                    if lower is not None and upper is not None:
+                        try:
+                            joint_limits[joint_name] = {
+                                'lower': float(lower),
+                                'upper': float(upper)
+                            }
+                        except ValueError:
+                            self.get_logger().warn(f'Invalid limit values for joint {joint_name}: lower={lower}, upper={upper}')
+            
+            self.get_logger().info(f'Loaded joint limits for {len(joint_limits)} joints from URDF')
+            return joint_limits
+            
+        except Exception as e:
+            self.get_logger().error(f'Error loading joint limits from URDF: {e}')
+            return self.get_default_joint_limits()
+    
+    def get_default_joint_limits(self):
+        """Return default joint limits as fallback"""
+        return {
+            'revolute_BEARING': {'lower': -1.8, 'upper': 1.8},
+            'Revolute_SERVO_LOWER': {'lower': -1.892348, 'upper': 1.574492},
+            'Revolute_SERVO_UPPER': {'lower': -1.548620, 'upper': 1.0},
+            'revolute_CAMERA_HOLDER_ARM_LOWER': {'lower': -1.0, 'upper': 1.0},
+            'revolute_GRIPPER_L1': {'lower': -0.785398, 'upper': 0.0},
+            'revolute_GRIPPER_L2': {'lower': -0.785398, 'upper': 0.0},
+            'Revolute_GRIPPER_R1': {'lower': 0.0, 'upper': 0.785398},
+            'Revolute_GRIPPER_R2': {'lower': -0.785398, 'upper': 0.0},
+        }
+    
+    def get_joint_limit(self, joint_name, limit_type='lower'):
+        """Get joint limit for a specific joint"""
+        if joint_name in self.joint_limits:
+            return self.joint_limits[joint_name].get(limit_type, 0.0)
+        # Fallback to default if not found
+        defaults = self.get_default_joint_limits()
+        if joint_name in defaults:
+            return defaults[joint_name].get(limit_type, 0.0)
+        return 0.0
         
     def setup_gui_thread(self):
         """Setup GUI in a separate thread"""
@@ -176,7 +254,9 @@ class JETANKGripperControlGUI(Node):
         # Bearing (Base Rotation)
         ttk.Label(arm_frame, text="Base Bearing:").pack(anchor=tk.W)
         self.bearing_var = tk.DoubleVar(value=0.0)
-        self.bearing_scale = ttk.Scale(arm_frame, from_=-1.5708, to=1.5708,
+        bearing_lower = self.get_joint_limit('revolute_BEARING', 'lower')
+        bearing_upper = self.get_joint_limit('revolute_BEARING', 'upper')
+        self.bearing_scale = ttk.Scale(arm_frame, from_=bearing_lower, to=bearing_upper,
                                       variable=self.bearing_var, orient=tk.HORIZONTAL,
                                       command=self.on_bearing_change)
         self.bearing_scale.pack(fill=tk.X, pady=2)
@@ -186,7 +266,9 @@ class JETANKGripperControlGUI(Node):
         # Lower Servo
         ttk.Label(arm_frame, text="Lower Servo:").pack(anchor=tk.W)
         self.servo_lower_var = tk.DoubleVar(value=0.0)
-        self.servo_lower_scale = ttk.Scale(arm_frame, from_=0.0, to=1.570796,
+        servo_lower_lower = self.get_joint_limit('Revolute_SERVO_LOWER', 'lower')
+        servo_lower_upper = self.get_joint_limit('Revolute_SERVO_LOWER', 'upper')
+        self.servo_lower_scale = ttk.Scale(arm_frame, from_=servo_lower_lower, to=servo_lower_upper,
                                           variable=self.servo_lower_var, orient=tk.HORIZONTAL,
                                           command=self.on_servo_lower_change)
         self.servo_lower_scale.pack(fill=tk.X, pady=2)
@@ -196,7 +278,9 @@ class JETANKGripperControlGUI(Node):
         # Upper Servo
         ttk.Label(arm_frame, text="Upper Servo:").pack(anchor=tk.W)
         self.servo_upper_var = tk.DoubleVar(value=0.0)
-        self.servo_upper_scale = ttk.Scale(arm_frame, from_=-3.1418, to=0.785594,
+        servo_upper_lower = self.get_joint_limit('Revolute_SERVO_UPPER', 'lower')
+        servo_upper_upper = self.get_joint_limit('Revolute_SERVO_UPPER', 'upper')
+        self.servo_upper_scale = ttk.Scale(arm_frame, from_=servo_upper_lower, to=servo_upper_upper,
                                           variable=self.servo_upper_var, orient=tk.HORIZONTAL,
                                           command=self.on_servo_upper_change)
         self.servo_upper_scale.pack(fill=tk.X, pady=2)
@@ -210,7 +294,9 @@ class JETANKGripperControlGUI(Node):
         # Camera Tilt
         ttk.Label(camera_frame, text="Camera Tilt (±45°):").pack(anchor=tk.W)
         self.camera_tilt_var = tk.DoubleVar(value=0.0)
-        self.camera_tilt_scale = ttk.Scale(camera_frame, from_=-0.785398, to=0.785398,
+        camera_lower = self.get_joint_limit('revolute_CAMERA_HOLDER_ARM_LOWER', 'lower')
+        camera_upper = self.get_joint_limit('revolute_CAMERA_HOLDER_ARM_LOWER', 'upper')
+        self.camera_tilt_scale = ttk.Scale(camera_frame, from_=camera_lower, to=camera_upper,
                                            variable=self.camera_tilt_var, orient=tk.HORIZONTAL,
                                            command=self.on_camera_tilt_change)
         self.camera_tilt_scale.pack(fill=tk.X, pady=2)
@@ -223,7 +309,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(left_frame, text="L1 Finger:").pack(anchor=tk.W)
         self.left_l1_var = tk.DoubleVar(value=0.0)
-        self.left_l1_scale = ttk.Scale(left_frame, from_=-0.785398, to=0.0, 
+        l1_lower = self.get_joint_limit('revolute_GRIPPER_L1', 'lower')
+        l1_upper = self.get_joint_limit('revolute_GRIPPER_L1', 'upper')
+        self.left_l1_scale = ttk.Scale(left_frame, from_=l1_lower, to=l1_upper, 
                                       variable=self.left_l1_var, orient=tk.HORIZONTAL,
                                       command=self.on_left_l1_change)
         self.left_l1_scale.pack(fill=tk.X, pady=2)
@@ -232,7 +320,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(left_frame, text="L2 Finger:").pack(anchor=tk.W)
         self.left_l2_var = tk.DoubleVar(value=0.0)
-        self.left_l2_scale = ttk.Scale(left_frame, from_=-0.785398, to=0.0,
+        l2_lower = self.get_joint_limit('revolute_GRIPPER_L2', 'lower')
+        l2_upper = self.get_joint_limit('revolute_GRIPPER_L2', 'upper')
+        self.left_l2_scale = ttk.Scale(left_frame, from_=l2_lower, to=l2_upper,
                                       variable=self.left_l2_var, orient=tk.HORIZONTAL,
                                       command=self.on_left_l2_change)
         self.left_l2_scale.pack(fill=tk.X, pady=2)
@@ -245,7 +335,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(right_frame, text="R1 Finger:").pack(anchor=tk.W)
         self.right_r1_var = tk.DoubleVar(value=0.0)
-        self.right_r1_scale = ttk.Scale(right_frame, from_=0.0, to=0.785398,
+        r1_lower = self.get_joint_limit('Revolute_GRIPPER_R1', 'lower')
+        r1_upper = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+        self.right_r1_scale = ttk.Scale(right_frame, from_=r1_lower, to=r1_upper,
                                        variable=self.right_r1_var, orient=tk.HORIZONTAL,
                                        command=self.on_right_r1_change)
         self.right_r1_scale.pack(fill=tk.X, pady=2)
@@ -254,7 +346,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(right_frame, text="R2 Finger:").pack(anchor=tk.W)
         self.right_r2_var = tk.DoubleVar(value=0.0)
-        self.right_r2_scale = ttk.Scale(right_frame, from_=-0.785398, to=0.0,
+        r2_lower = self.get_joint_limit('Revolute_GRIPPER_R2', 'lower')
+        r2_upper = self.get_joint_limit('Revolute_GRIPPER_R2', 'upper')
+        self.right_r2_scale = ttk.Scale(right_frame, from_=r2_lower, to=r2_upper,
                                        variable=self.right_r2_var, orient=tk.HORIZONTAL,
                                        command=self.on_right_r2_change)
         self.right_r2_scale.pack(fill=tk.X, pady=2)
@@ -406,7 +500,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(left_simple_frame, text="Left Gripper:").pack(anchor=tk.W)
         self.simple_left_var = tk.DoubleVar(value=0.0)
-        self.simple_left_scale = ttk.Scale(left_simple_frame, from_=0.0, to=-0.785398,
+        simple_left_lower = self.get_joint_limit('revolute_GRIPPER_L1', 'lower')
+        simple_left_upper = self.get_joint_limit('revolute_GRIPPER_L1', 'upper')
+        self.simple_left_scale = ttk.Scale(left_simple_frame, from_=simple_left_upper, to=simple_left_lower,
                                           variable=self.simple_left_var, orient=tk.HORIZONTAL,
                                           command=self.on_simple_left_change)
         self.simple_left_scale.pack(fill=tk.X, pady=2)
@@ -419,7 +515,9 @@ class JETANKGripperControlGUI(Node):
         
         ttk.Label(right_simple_frame, text="Right Gripper:").pack(anchor=tk.W)
         self.simple_right_var = tk.DoubleVar(value=0.0)
-        self.simple_right_scale = ttk.Scale(right_simple_frame, from_=0.0, to=0.785398,
+        simple_right_lower = self.get_joint_limit('Revolute_GRIPPER_R1', 'lower')
+        simple_right_upper = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+        self.simple_right_scale = ttk.Scale(right_simple_frame, from_=simple_right_lower, to=simple_right_upper,
                                            variable=self.simple_right_var, orient=tk.HORIZONTAL,
                                            command=self.on_simple_right_change)
         self.simple_right_scale.pack(fill=tk.X, pady=2)
