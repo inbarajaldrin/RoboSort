@@ -4,14 +4,31 @@ from launch_ros.actions import Node
 from launch import LaunchDescription
 import xacro
 import os
+import tempfile
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     share_dir = get_package_share_directory('JETANK_description')
 
     xacro_file = os.path.join(share_dir, 'urdf', 'JETANK.xacro')
-    robot_description_config = xacro.process_file(xacro_file)
-    robot_urdf = robot_description_config.toxml()
+    # Read and preprocess xacro file to replace $(find ...) with actual paths
+    with open(xacro_file, 'r') as f:
+        xacro_content = f.read()
+    
+    # Replace $(find JETANK_description) with actual package path
+    xacro_content = xacro_content.replace('$(find JETANK_description)', share_dir)
+    
+    # Write preprocessed content to temporary file and process it
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xacro', delete=False) as tmp_file:
+        tmp_file.write(xacro_content)
+        tmp_xacro_file = tmp_file.name
+    
+    try:
+        robot_description_config = xacro.process_file(tmp_xacro_file)
+        robot_urdf = robot_description_config.toxml()
+    finally:
+        # Clean up temporary file
+        os.unlink(tmp_xacro_file)
 
     rviz_config_file = os.path.join(share_dir, 'config', 'display.rviz')
 
