@@ -20,10 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'camera = jetank_control.camera:main',
-            'imu = jetank_control.imu:main',
-            'servo = jetank_control.servo:main',
-            'motor = jetank_control.motor:main',
+            'camera = jetank_control.drivers.camera:main',
+            'imu = jetank_control.drivers.imu:main',
+            'servo = jetank_control.drivers.servo:main',
+            'motor = jetank_control.drivers.motor:main',
         ],
     },
 )
