@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'camera = jetank_control.camera:main',
+            'imu = jetank_control.imu:main',
         ],
     },
 )
