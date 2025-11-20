@@ -23,6 +23,7 @@ setup(
             'camera = jetank_control.camera:main',
             'imu = jetank_control.imu:main',
             'servo = jetank_control.servo:main',
+            'motor = jetank_control.motor:main',
         ],
     },
 )
