@@ -450,9 +450,17 @@ class JETANKGripperControlGUI(Node):
         ttk.Button(object_button_frame, text="Refresh Objects", 
                   command=self.refresh_objects).pack(side=tk.LEFT, padx=5)
         
-        # Trajectory control
-        trajectory_frame = ttk.Frame(arm_control_frame)
-        trajectory_frame.pack(fill=tk.X, pady=5)
+        # Trajectory and Camera control in side-by-side layout
+        trajectory_camera_frame = ttk.Frame(arm_control_frame)
+        trajectory_camera_frame.pack(fill=tk.X, pady=5)
+        
+        # Left side: Trajectory control
+        trajectory_left_frame = ttk.Frame(trajectory_camera_frame)
+        trajectory_left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Trajectory checkbox
+        trajectory_frame = ttk.Frame(trajectory_left_frame)
+        trajectory_frame.pack(fill=tk.X, pady=2)
         self.use_trajectory_var = tk.BooleanVar(value=True)
         self.trajectory_checkbox = ttk.Checkbutton(trajectory_frame, text="Use Trajectory Movement", 
                                                   variable=self.use_trajectory_var,
@@ -460,12 +468,23 @@ class JETANKGripperControlGUI(Node):
         self.trajectory_checkbox.pack(side=tk.LEFT)
         
         # Duration input (always visible)
-        self.duration_frame = ttk.Frame(arm_control_frame)
-        self.duration_frame.pack(fill=tk.X, pady=5)
+        self.duration_frame = ttk.Frame(trajectory_left_frame)
+        self.duration_frame.pack(fill=tk.X, pady=2)
         ttk.Label(self.duration_frame, text="Duration (sec):").pack(side=tk.LEFT)
-        self.duration_var = tk.StringVar(value="3.0")
+        self.duration_var = tk.StringVar(value="7.0")
         self.duration_entry = ttk.Entry(self.duration_frame, textvariable=self.duration_var, width=10)
         self.duration_entry.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Right side: Camera control in LabelFrame
+        camera_control_frame = ttk.LabelFrame(trajectory_camera_frame, text="Camera", padding="10")
+        camera_control_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        camera_button_frame = ttk.Frame(camera_control_frame)
+        camera_button_frame.pack(fill=tk.X)
+        ttk.Button(camera_button_frame, text="Down", 
+                  command=self.camera_down).pack(side=tk.LEFT, padx=2)
+        ttk.Button(camera_button_frame, text="Reset", 
+                  command=self.camera_reset).pack(side=tk.LEFT, padx=2)
         
         # Move button
         button_frame = ttk.Frame(arm_control_frame)
@@ -836,14 +855,14 @@ class JETANKGripperControlGUI(Node):
                     self.update_status("Error: Trajectory in progress")
                     return
                 
-                # Get current joint positions
+                # Get current joint positions (arm only, not camera)
                 current_joints = [
                     self.joint_state.position[self.arm_joint_indices['BEARING']],
                     self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']],
                     self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']]
                 ]
                 
-                # Target joint positions (home position)
+                # Target joint positions (home position, arm only)
                 target_joints = [0.0, 0.0, 0.0]
                 
                 # Start trajectory execution in separate thread
@@ -871,30 +890,126 @@ class JETANKGripperControlGUI(Node):
                 self.error_text.see(tk.END)
                 self.update_status(f"Error: {str(e)}")
         else:
-            # Use instant reset
+            # Use instant reset (arm only, camera not affected)
             # Reset arm joints to default positions
             self.bearing_var.set(0.0)
             self.servo_lower_var.set(0.0)
             self.servo_upper_var.set(0.0)
             
-            # Reset camera tilt
-            self.camera_tilt_var.set(0.0)
-            
-            # Update joint positions
+            # Update joint positions (arm only)
             self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
             self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
             self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
-            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
             
             # Update labels
             self.bearing_label.config(text="0.000")
             self.servo_lower_label.config(text="0.000")
             self.servo_upper_label.config(text="0.000")
-            self.camera_tilt_label.config(text="0.000 rad (0.0°)")
             
-            self.error_text.insert(tk.END, "Arm and camera reset to home position\n")
+            self.error_text.insert(tk.END, "Arm reset to home position (camera unchanged)\n")
             self.error_text.see(tk.END)
-            self.update_status("Arm and camera reset to home position")
+            self.update_status("Arm reset to home position")
+    
+    def camera_down(self):
+        """Move camera down to -30 degrees"""
+        # Convert -30 degrees to radians
+        target_angle = math.radians(-30.0)
+        
+        # Check if trajectory is enabled
+        if self.use_trajectory_var.get():
+            # Use trajectory movement with fixed 3 second duration
+            try:
+                duration = 3.0  # Fixed duration for camera movement
+                
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
+                
+                # Get current camera position
+                current_angle = self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']]
+                
+                # Start camera trajectory execution in separate thread
+                self.trajectory_active = True
+                self.trajectory_thread = threading.Thread(
+                    target=self.execute_camera_trajectory, 
+                    args=(current_angle, target_angle, duration),
+                    daemon=True
+                )
+                self.trajectory_thread.start()
+                
+                self.error_text.insert(tk.END, f"Camera down trajectory started:\n")
+                self.error_text.insert(tk.END, f"  From: {math.degrees(current_angle):.1f}°\n")
+                self.error_text.insert(tk.END, f"  To: -30.0°\n")
+                self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Executing camera down trajectory")
+                
+            except Exception as e:
+                self.error_text.insert(tk.END, f"Error: {str(e)}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Error: {str(e)}")
+        else:
+            # Use instant movement
+            self.camera_tilt_var.set(target_angle)
+            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+            self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (-30.0°)")
+            
+            self.error_text.insert(tk.END, f"Camera moved to -30.0°\n")
+            self.error_text.see(tk.END)
+            self.update_status("Camera moved to -30.0°")
+    
+    def camera_reset(self):
+        """Reset camera to 0 degrees"""
+        target_angle = 0.0
+        
+        # Check if trajectory is enabled
+        if self.use_trajectory_var.get():
+            # Use trajectory movement with fixed 3 second duration
+            try:
+                duration = 3.0  # Fixed duration for camera movement
+                
+                # Check if trajectory is already active
+                if self.trajectory_active:
+                    self.error_text.insert(tk.END, "Error: Trajectory already in progress. Please wait.\n")
+                    self.error_text.see(tk.END)
+                    self.update_status("Error: Trajectory in progress")
+                    return
+                
+                # Get current camera position
+                current_angle = self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']]
+                
+                # Start camera trajectory execution in separate thread
+                self.trajectory_active = True
+                self.trajectory_thread = threading.Thread(
+                    target=self.execute_camera_trajectory, 
+                    args=(current_angle, target_angle, duration),
+                    daemon=True
+                )
+                self.trajectory_thread.start()
+                
+                self.error_text.insert(tk.END, f"Camera reset trajectory started:\n")
+                self.error_text.insert(tk.END, f"  From: {math.degrees(current_angle):.1f}°\n")
+                self.error_text.insert(tk.END, f"  To: 0.0°\n")
+                self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Executing camera reset trajectory")
+                
+            except Exception as e:
+                self.error_text.insert(tk.END, f"Error: {str(e)}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Error: {str(e)}")
+        else:
+            # Use instant movement
+            self.camera_tilt_var.set(target_angle)
+            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+            self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (0.0°)")
+            
+            self.error_text.insert(tk.END, f"Camera reset to 0.0°\n")
+            self.error_text.see(tk.END)
+            self.update_status("Camera reset to 0.0°")
         
     def on_trajectory_checkbox_change(self):
         """Handle trajectory checkbox change"""
@@ -1020,7 +1135,7 @@ class JETANKGripperControlGUI(Node):
         self.update_status(f"Trajectory error: {error_msg}")
         
     def execute_reset_trajectory(self, start_joints, target_joints, duration):
-        """Execute smooth trajectory from current position to home position (0,0,0)"""
+        """Execute smooth trajectory from current position to home position (0,0,0) - arm only, not camera"""
         try:
             # Calculate number of steps (50 steps per second for smooth motion)
             steps = max(10, int(duration * 50))
@@ -1070,7 +1185,7 @@ class JETANKGripperControlGUI(Node):
                     pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
                     current_positions.append(pos)
                 
-                # Update joint state
+                # Update joint state (arm only, camera not affected)
                 self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
                 self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
                 self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
@@ -1101,7 +1216,7 @@ class JETANKGripperControlGUI(Node):
     def update_gui_during_reset_trajectory(self, joint_positions):
         """Update GUI sliders during reset trajectory execution (called from main thread)"""
         try:
-            # Update sliders
+            # Update sliders (arm only, camera not affected)
             self.bearing_var.set(joint_positions[0])
             self.servo_lower_var.set(joint_positions[1])
             self.servo_upper_var.set(joint_positions[2])
@@ -1116,21 +1231,83 @@ class JETANKGripperControlGUI(Node):
             
     def reset_trajectory_completed(self):
         """Handle reset trajectory completion (called from main thread)"""
-        # Also reset camera tilt to 0
-        self.camera_tilt_var.set(0.0)
-        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
-        self.camera_tilt_label.config(text="0.000 rad (0.0°)")
-        
         self.error_text.insert(tk.END, f"Reset trajectory completed successfully!\n")
-        self.error_text.insert(tk.END, f"Arm and camera reset to home position\n\n")
+        self.error_text.insert(tk.END, f"Arm reset to home position (camera unchanged)\n\n")
         self.error_text.see(tk.END)
-        self.update_status("Reset trajectory completed - Arm and camera at home position")
+        self.update_status("Reset trajectory completed - Arm at home position")
         
     def reset_trajectory_error(self, error_msg):
         """Handle reset trajectory error (called from main thread)"""
         self.error_text.insert(tk.END, f"Reset trajectory error: {error_msg}\n")
         self.error_text.see(tk.END)
         self.update_status(f"Reset trajectory error: {error_msg}")
+    
+    def execute_camera_trajectory(self, start_angle, target_angle, duration):
+        """Execute smooth trajectory for camera joint only"""
+        try:
+            # Calculate number of steps (50 steps per second for smooth motion)
+            steps = max(10, int(duration * 50))
+            
+            # Update GUI in real-time during trajectory execution
+            start_time = time.time()
+            while time.time() - start_time < duration and self.trajectory_active:
+                elapsed = time.time() - start_time
+                t = min(1.0, elapsed / duration)
+                
+                # Smooth interpolation using cubic easing
+                t_smooth = 3 * t**2 - 2 * t**3
+                
+                # Calculate current camera angle
+                current_angle = start_angle + (target_angle - start_angle) * t_smooth
+                
+                # Update joint state
+                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = current_angle
+                
+                # Update GUI slider (thread-safe)
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_camera_trajectory, current_angle)
+                
+                time.sleep(0.02)  # 50Hz update rate
+            
+            # Ensure final position is set
+            if self.trajectory_active:
+                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+                
+                # Update GUI to final position
+                if hasattr(self, 'root') and self.root.winfo_exists():
+                    self.root.after(0, self.update_gui_during_camera_trajectory, target_angle)
+                    self.root.after(0, self.camera_trajectory_completed)
+            
+        except Exception as e:
+            if hasattr(self, 'root') and self.root.winfo_exists():
+                self.root.after(0, self.camera_trajectory_error, str(e))
+        finally:
+            self.trajectory_active = False
+    
+    def update_gui_during_camera_trajectory(self, camera_angle):
+        """Update GUI slider during camera trajectory execution (called from main thread)"""
+        try:
+            # Update slider
+            self.camera_tilt_var.set(camera_angle)
+            
+            # Update label
+            degrees = math.degrees(camera_angle)
+            self.camera_tilt_label.config(text=f"{camera_angle:.3f} rad ({degrees:.1f}°)")
+            
+        except Exception as e:
+            pass  # Ignore GUI update errors during trajectory
+    
+    def camera_trajectory_completed(self):
+        """Handle camera trajectory completion (called from main thread)"""
+        self.error_text.insert(tk.END, f"Camera trajectory completed successfully!\n\n")
+        self.error_text.see(tk.END)
+        self.update_status("Camera trajectory completed")
+    
+    def camera_trajectory_error(self, error_msg):
+        """Handle camera trajectory error (called from main thread)"""
+        self.error_text.insert(tk.END, f"Camera trajectory error: {error_msg}\n")
+        self.error_text.see(tk.END)
+        self.update_status(f"Camera trajectory error: {error_msg}")
         
     def execute_gripper_trajectory(self, start_joints, target_joints, duration):
         """Execute smooth trajectory for gripper joints with force monitoring"""
