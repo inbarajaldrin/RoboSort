@@ -6,6 +6,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from std_msgs.msg import Float64MultiArray, Float32
+from rosgraph_msgs.msg import Clock
 from max_camera_msgs.msg import ObjectPoseArray, ObjectPose
 import tkinter as tk
 from tkinter import ttk
@@ -64,7 +65,7 @@ class JETANKGripperControlGUI(Node):
         self.gripper_force_r2 = 0.0
         self.gripper_force_l2 = 0.0
         self.force_lock = threading.Lock()
-        self.force_threshold = 5.0  # Default threshold
+        self.force_threshold = 0.5  # Default threshold (stops when both R2 and L2 exceed this value)
         
         # Create subscribers for gripper force topics
         self.force_r2_sub = self.create_subscription(
@@ -80,6 +81,15 @@ class JETANKGripperControlGUI(Node):
             self.force_l2_callback,
             10
         )
+        
+        # Simulation clock synchronization (only active during gripper closing)
+        self.sim_clock = None
+        self.sim_clock_lock = threading.Lock()
+        self.sim_clock_sub = None  # Will be created when closing gripper
+        self.sim_time_offset = None  # Initial sim time when closing starts
+        self.use_sim_clock = False  # Flag to enable sim clock usage
+        self.publish_rate = 10.0  # Target publishing rate (Hz)
+        self.last_publish_sim_time = None
         
         # Initialize joint state message with all JETANK revolute joints
         self.joint_state = JointState()
@@ -129,10 +139,18 @@ class JETANKGripperControlGUI(Node):
         self.trajectory_active = False
         self.trajectory_thread = None
         
+        # Gripper retry control
+        # We retry up to 3 times after reaching the force threshold to handle potential
+        # slip in simulation and ensure the object is securely held by the gripper
+        self.gripper_retry_count = 0
+        self.max_gripper_retries = 3
+        self.force_threshold_reached = False
+        
         # Create Tkinter GUI in a separate thread
         self.setup_gui_thread()
         
-        # Create timer for publishing joint states
+        # Create timer for publishing joint states (will be adjusted based on sim clock)
+        # Start with 0.1s (10Hz), will adjust dynamically
         self.timer = self.create_timer(0.1, self.publish_joint_states)
         
         self.get_logger().info('JETANK Gripper Control GUI initialized')
@@ -1359,6 +1377,8 @@ class JETANKGripperControlGUI(Node):
             # Update GUI in real-time during trajectory execution
             start_time = time.time()
             force_exceeded = False
+            previous_above_threshold = False  # Track previous state to detect threshold crossings
+            
             while time.time() - start_time < duration and self.trajectory_active:
                 elapsed = time.time() - start_time
                 t = min(1.0, elapsed / duration)
@@ -1367,30 +1387,66 @@ class JETANKGripperControlGUI(Node):
                 # Check forces if closing
                 if is_closing:
                     force_r2, force_l2 = self.get_gripper_forces()
-                    max_force = max(force_r2, force_l2)
                     
-                    if max_force >= self.force_threshold:
-                            # Force threshold exceeded - stop closing
+                    # Check if both forces exceed threshold
+                    current_above_threshold = (force_r2 >= self.force_threshold and force_l2 >= self.force_threshold)
+                    
+                    # Detect threshold crossing (went from below to above threshold)
+                    if current_above_threshold and not previous_above_threshold:
+                        # Threshold just crossed - increment retry count
+                        self.gripper_retry_count += 1
+                        
+                        # Get current positions at threshold crossing
+                        current_positions = []
+                        for j in range(4):
+                            pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                            current_positions.append(pos)
+                        
+                        # Update joint state to current position (hold at threshold position)
+                        self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
+                        self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
+                        self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
+                        self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
+                        
+                        # Notify GUI about threshold reached
+                        if hasattr(self, 'root') and self.root.winfo_exists():
+                            self.root.after(0, self.gripper_threshold_reached, current_positions, force_r2, force_l2, self.gripper_retry_count)
+                        
+                        # If we've reached max retries, stop completely
+                        if self.gripper_retry_count > self.max_gripper_retries:
                             force_exceeded = True
                             self.trajectory_active = False
                             
-                            # Get current positions at stopping point
-                            current_positions = []
-                            for j in range(4):
-                                pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
-                                current_positions.append(pos)
-                            
-                            # Update joint state to current position
-                            self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
-                            self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
-                            self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
-                            self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
-                            
-                            # Notify GUI
+                            # Notify GUI that gripper stopped after retries
                             if hasattr(self, 'root') and self.root.winfo_exists():
-                                self.root.after(0, self.gripper_force_stopped, current_positions, max_force)
+                                self.root.after(0, self.gripper_force_stopped, current_positions, force_r2, force_l2)
                             
                             break
+                        
+                        # Otherwise, wait 1 second before continuing (retry)
+                        # Retry mechanism helps handle slip in simulation and ensures object is securely held
+                        time.sleep(1.0)
+                        
+                        # Check if forces are still above threshold after delay
+                        force_r2_check, force_l2_check = self.get_gripper_forces()
+                        if force_r2_check >= self.force_threshold and force_l2_check >= self.force_threshold:
+                            # Forces still above threshold - stop instead of continuing
+                            force_exceeded = True
+                            self.trajectory_active = False
+                            
+                            # Notify GUI that gripper stopped (threshold still met after delay)
+                            if hasattr(self, 'root') and self.root.winfo_exists():
+                                self.root.after(0, self.gripper_force_stopped, current_positions, force_r2_check, force_l2_check)
+                            
+                            break
+                        
+                        # Forces dropped below threshold - continue closing from current position
+                        # Update start positions to current position for next retry attempt
+                        start_joints = current_positions.copy()
+                        start_time = time.time()  # Reset timer for next retry
+                        previous_above_threshold = False  # Reset to detect next threshold crossing
+                    
+                    previous_above_threshold = current_above_threshold
                 
                 # Calculate current positions
                 current_positions = []
@@ -1462,20 +1518,45 @@ class JETANKGripperControlGUI(Node):
             
     def gripper_trajectory_completed(self):
         """Handle gripper trajectory completion (called from main thread)"""
+        # Stop simulation clock monitoring
+        self._stop_sim_clock_monitoring()
+        
         self.gripper_status_text.insert(tk.END, f"Gripper trajectory completed successfully!\n\n")
         self.gripper_status_text.see(tk.END)
         self.update_status("Gripper trajectory completed")
     
-    def gripper_force_stopped(self, current_positions, max_force):
-        """Handle gripper stopping due to force threshold (called from main thread)"""
-        self.gripper_status_text.insert(tk.END, f"Gripper stopped due to force threshold!\n")
-        self.gripper_status_text.insert(tk.END, f"  Max force detected: {max_force:.3f} (threshold: {self.force_threshold})\n")
-        self.gripper_status_text.insert(tk.END, f"  Stopped at position: L1={current_positions[0]:.3f}, L2={current_positions[1]:.3f}, R1={current_positions[2]:.3f}, R2={current_positions[3]:.3f}\n\n")
+    def gripper_threshold_reached(self, current_positions, force_r2, force_l2, retry_count):
+        """Handle gripper threshold reached (called from main thread) - may continue or stop"""
+        self.gripper_status_text.insert(tk.END, f"Force threshold reached (Attempt {retry_count}/{self.max_gripper_retries + 1}):\n")
+        self.gripper_status_text.insert(tk.END, f"  R2 force: {force_r2:.3f} (threshold: {self.force_threshold})\n")
+        self.gripper_status_text.insert(tk.END, f"  L2 force: {force_l2:.3f} (threshold: {self.force_threshold})\n")
+        
+        if retry_count <= self.max_gripper_retries:
+            self.gripper_status_text.insert(tk.END, f"  Continuing to close (retry {retry_count}/{self.max_gripper_retries})...\n\n")
+            self.update_status(f"Threshold reached - Retrying close ({retry_count}/{self.max_gripper_retries})")
+        else:
+            self.gripper_status_text.insert(tk.END, f"  Maximum retries reached - Stopping\n\n")
+            self.update_status(f"Gripper stopped after {self.max_gripper_retries} retries")
+        
         self.gripper_status_text.see(tk.END)
-        self.update_status(f"Gripper stopped - Force threshold exceeded ({max_force:.2f})")
+    
+    def gripper_force_stopped(self, current_positions, force_r2, force_l2):
+        """Handle gripper stopping due to force threshold after max retries (called from main thread)"""
+        # Stop simulation clock monitoring
+        self._stop_sim_clock_monitoring()
+        
+        self.gripper_status_text.insert(tk.END, f"Gripper stopped after {self.max_gripper_retries} retries!\n")
+        self.gripper_status_text.insert(tk.END, f"  R2 force: {force_r2:.3f} (threshold: {self.force_threshold})\n")
+        self.gripper_status_text.insert(tk.END, f"  L2 force: {force_l2:.3f} (threshold: {self.force_threshold})\n")
+        self.gripper_status_text.insert(tk.END, f"  Final position: L1={current_positions[0]:.3f}, L2={current_positions[1]:.3f}, R1={current_positions[2]:.3f}, R2={current_positions[3]:.3f}\n\n")
+        self.gripper_status_text.see(tk.END)
+        self.update_status(f"Gripper stopped - Max retries reached (R2: {force_r2:.2f}, L2: {force_l2:.2f})")
         
     def gripper_trajectory_error(self, error_msg):
         """Handle gripper trajectory error (called from main thread)"""
+        # Stop simulation clock monitoring
+        self._stop_sim_clock_monitoring()
+        
         self.gripper_status_text.insert(tk.END, f"Gripper trajectory error: {error_msg}\n")
         self.gripper_status_text.see(tk.END)
         self.update_status(f"Gripper trajectory error: {error_msg}")
@@ -1760,6 +1841,13 @@ class JETANKGripperControlGUI(Node):
                     self.update_status("Error: Trajectory in progress")
                     return
                 
+                # Start simulation clock monitoring for gripper closing
+                self._start_sim_clock_monitoring()
+                
+                # Reset retry counter for new close operation
+                self.gripper_retry_count = 0
+                self.force_threshold_reached = False
+                
                 # Get current gripper joint positions
                 current_gripper_joints = [
                     self.joint_state.position[self.gripper_joint_indices['L1']],
@@ -1935,6 +2023,53 @@ class JETANKGripperControlGUI(Node):
         with self.force_lock:
             self.gripper_force_l2 = abs(msg.data)  # Use absolute value for force
     
+    def _start_sim_clock_monitoring(self):
+        """Start monitoring simulation clock for gripper closing"""
+        from builtin_interfaces.msg import Time
+        
+        with self.sim_clock_lock:
+            # Subscribe to simulation clock if not already subscribed
+            if self.sim_clock_sub is None:
+                self.sim_clock_sub = self.create_subscription(
+                    Clock,
+                    '/clock_sim',
+                    self.clock_callback,
+                    10
+                )
+                self.get_logger().info('Started simulation clock monitoring for gripper closing')
+            
+            # Reset sim clock state
+            self.sim_clock = None
+            self.sim_time_offset = None
+            self.use_sim_clock = True
+            self.last_publish_sim_time = None
+    
+    def _stop_sim_clock_monitoring(self):
+        """Stop monitoring simulation clock"""
+        with self.sim_clock_lock:
+            self.use_sim_clock = False
+            # Note: We don't destroy the subscriber as it may be needed again
+            # Just disable its usage
+    
+    def clock_callback(self, msg):
+        """Callback for simulation clock - only active during gripper closing"""
+        from builtin_interfaces.msg import Time
+        
+        if not self.use_sim_clock:
+            return  # Only process if gripper closing is active
+        
+        with self.sim_clock_lock:
+            # Store the clock time message
+            clock_time = Time()
+            clock_time.sec = msg.clock.sec
+            clock_time.nanosec = msg.clock.nanosec
+            self.sim_clock = clock_time
+            
+            # Set initial sim time offset on first clock message
+            if self.sim_time_offset is None:
+                self.sim_time_offset = msg.clock.sec + msg.clock.nanosec * 1e-9
+                self.get_logger().info(f'Simulation clock offset set: {self.sim_time_offset}')
+    
     def get_gripper_forces(self):
         """Get current gripper forces (thread-safe)"""
         with self.force_lock:
@@ -2015,9 +2150,30 @@ class JETANKGripperControlGUI(Node):
             self.status_label.config(text=message)
         
     def publish_joint_states(self):
-        """Publish current joint states"""
+        """Publish current joint states synchronized with simulation clock during gripper closing"""
         if self.running:
-            self.joint_state.header.stamp = self.get_clock().now().to_msg()
+            # Use simulation clock only during gripper closing
+            with self.sim_clock_lock:
+                if self.use_sim_clock and self.sim_clock is not None:
+                    # Use simulation clock timestamp
+                    self.joint_state.header.stamp = self.sim_clock
+                    
+                    # Check if we should publish based on simulation time
+                    current_sim_time = self.sim_clock.sec + self.sim_clock.nanosec * 1e-9
+                    
+                    if self.last_publish_sim_time is not None:
+                        sim_delta = current_sim_time - self.last_publish_sim_time
+                        min_period = 1.0 / self.publish_rate  # Minimum period for target rate
+                        
+                        # Only publish if enough simulation time has passed
+                        if sim_delta < min_period:
+                            return  # Skip this publish, too soon
+                    
+                    self.last_publish_sim_time = current_sim_time
+                else:
+                    # Use system clock when not closing gripper
+                    self.joint_state.header.stamp = self.get_clock().now().to_msg()
+            
             self.joint_state_pub.publish(self.joint_state)
 
 def main(args=None):
