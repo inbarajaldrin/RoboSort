@@ -5,7 +5,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Float32
 from max_camera_msgs.msg import ObjectPoseArray, ObjectPose
 import tkinter as tk
 from tkinter import ttk
@@ -57,6 +57,27 @@ class JETANKGripperControlGUI(Node):
             ObjectPoseArray,
             '/objects_poses',
             self.objects_callback,
+            10
+        )
+        
+        # Force monitoring for gripper
+        self.gripper_force_r2 = 0.0
+        self.gripper_force_l2 = 0.0
+        self.force_lock = threading.Lock()
+        self.force_threshold = 5.0  # Default threshold
+        
+        # Create subscribers for gripper force topics
+        self.force_r2_sub = self.create_subscription(
+            Float32,
+            '/gripper_r2/contact_force',
+            self.force_r2_callback,
+            10
+        )
+        
+        self.force_l2_sub = self.create_subscription(
+            Float32,
+            '/gripper_l2/contact_force',
+            self.force_l2_callback,
             10
         )
         
@@ -519,7 +540,7 @@ class JETANKGripperControlGUI(Node):
         self.gripper_duration_frame = ttk.Frame(gripper_frame)
         self.gripper_duration_frame.pack(fill=tk.X, pady=5)
         ttk.Label(self.gripper_duration_frame, text="Gripper Duration (sec):").pack(side=tk.LEFT)
-        self.gripper_duration_var = tk.StringVar(value="1.0")
+        self.gripper_duration_var = tk.StringVar(value="10.0")
         self.gripper_duration_entry = ttk.Entry(self.gripper_duration_frame, textvariable=self.gripper_duration_var, width=10)
         self.gripper_duration_entry.pack(side=tk.LEFT, padx=(5, 0))
         
@@ -1112,8 +1133,17 @@ class JETANKGripperControlGUI(Node):
         self.update_status(f"Reset trajectory error: {error_msg}")
         
     def execute_gripper_trajectory(self, start_joints, target_joints, duration):
-        """Execute smooth trajectory for gripper joints"""
+        """Execute smooth trajectory for gripper joints with force monitoring"""
         try:
+            # Determine if we're closing (target is more closed than start)
+            # For closing: target positions are closer to 0.0 than start positions
+            is_closing = False
+            if len(target_joints) == 4 and len(start_joints) == 4:
+                # Check if average target position is closer to 0 than start
+                avg_start = sum(abs(s) for s in start_joints) / 4.0
+                avg_target = sum(abs(t) for t in target_joints) / 4.0
+                is_closing = avg_target < avg_start
+            
             # Calculate number of steps (50 steps per second for smooth motion)
             steps = max(10, int(duration * 50))
             dt = duration / steps
@@ -1151,10 +1181,39 @@ class JETANKGripperControlGUI(Node):
             
             # Update GUI in real-time during trajectory execution
             start_time = time.time()
+            force_exceeded = False
             while time.time() - start_time < duration and self.trajectory_active:
                 elapsed = time.time() - start_time
                 t = min(1.0, elapsed / duration)
                 t_smooth = 3 * t**2 - 2 * t**3
+                
+                # Check forces if closing
+                if is_closing:
+                    force_r2, force_l2 = self.get_gripper_forces()
+                    max_force = max(force_r2, force_l2)
+                    
+                    if max_force >= self.force_threshold:
+                            # Force threshold exceeded - stop closing
+                            force_exceeded = True
+                            self.trajectory_active = False
+                            
+                            # Get current positions at stopping point
+                            current_positions = []
+                            for j in range(4):
+                                pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
+                                current_positions.append(pos)
+                            
+                            # Update joint state to current position
+                            self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
+                            self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
+                            self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
+                            self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
+                            
+                            # Notify GUI
+                            if hasattr(self, 'root') and self.root.winfo_exists():
+                                self.root.after(0, self.gripper_force_stopped, current_positions, max_force)
+                            
+                            break
                 
                 # Calculate current positions
                 current_positions = []
@@ -1229,6 +1288,14 @@ class JETANKGripperControlGUI(Node):
         self.gripper_status_text.insert(tk.END, f"Gripper trajectory completed successfully!\n\n")
         self.gripper_status_text.see(tk.END)
         self.update_status("Gripper trajectory completed")
+    
+    def gripper_force_stopped(self, current_positions, max_force):
+        """Handle gripper stopping due to force threshold (called from main thread)"""
+        self.gripper_status_text.insert(tk.END, f"Gripper stopped due to force threshold!\n")
+        self.gripper_status_text.insert(tk.END, f"  Max force detected: {max_force:.3f} (threshold: {self.force_threshold})\n")
+        self.gripper_status_text.insert(tk.END, f"  Stopped at position: L1={current_positions[0]:.3f}, L2={current_positions[1]:.3f}, R1={current_positions[2]:.3f}, R2={current_positions[3]:.3f}\n\n")
+        self.gripper_status_text.see(tk.END)
+        self.update_status(f"Gripper stopped - Force threshold exceeded ({max_force:.2f})")
         
     def gripper_trajectory_error(self, error_msg):
         """Handle gripper trajectory error (called from main thread)"""
@@ -1680,6 +1747,21 @@ class JETANKGripperControlGUI(Node):
                     'yaw': obj.yaw,
                     'header': obj.header
                 }
+    
+    def force_r2_callback(self, msg):
+        """Callback for gripper R2 force topic"""
+        with self.force_lock:
+            self.gripper_force_r2 = abs(msg.data)  # Use absolute value for force
+    
+    def force_l2_callback(self, msg):
+        """Callback for gripper L2 force topic"""
+        with self.force_lock:
+            self.gripper_force_l2 = abs(msg.data)  # Use absolute value for force
+    
+    def get_gripper_forces(self):
+        """Get current gripper forces (thread-safe)"""
+        with self.force_lock:
+            return self.gripper_force_r2, self.gripper_force_l2
     
     def get_object_position(self, object_name):
         """Get position of a specific object by name"""
