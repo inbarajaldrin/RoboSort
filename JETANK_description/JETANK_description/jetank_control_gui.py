@@ -20,34 +20,267 @@ import math
 import xml.etree.ElementTree as ET
 from ament_index_python.packages import get_package_share_directory
 
-# Import IK functions from share/scripts directory
-package_dir = get_package_share_directory('JETANK_description')
-scripts_path = os.path.join(package_dir, 'scripts')
-if scripts_path not in sys.path:
-    sys.path.insert(0, scripts_path)
-
+# Try to import scipy - required for IK functions
 try:
-    from ik import compute_ik, forward_kinematics, verify_solution
+    from scipy.optimize import minimize
+    from scipy.spatial.transform import Rotation as R
+    SCIPY_AVAILABLE = True
 except ImportError:
+    SCIPY_AVAILABLE = False
+    minimize = None
+    R = None
+    print("Warning: scipy not available. IK functions will be disabled.")
+
+# IK functions directly embedded in this file
+def forward_kinematics(theta0, theta1, theta3):
+    """
+    Calculate forward kinematics for JETANK robot
+    Returns transformation matrix and position
+    """
+    # Joint limits (from URDF)
+    limits = [
+        {'lower': -1.5708, 'upper': 1.5708},      # Joint 0
+        {'lower': 0.0,     'upper': 1.570796},    # Joint 1
+        {'lower': -3.1418, 'upper': 0.785594}     # Joint 3
+    ]
+    
+    # Check joint limits
+    if theta0 < limits[0]['lower'] or theta0 > limits[0]['upper']:
+        return None, None
+    if theta1 < limits[1]['lower'] or theta1 > limits[1]['upper']:
+        return None, None
+    if theta3 < limits[2]['lower'] or theta3 > limits[2]['upper']:
+        return None, None
+    
+    # DH parameters (in meters)
+    dh_params = [
+        {'alpha': 1.57, 'a': -13.50/1000, 'd': 75.00/1000},  # Link 0
+        {'alpha': -1.57,  'a': 0.00/1000,   'd': 0.00/1000},   # Link 1  
+        {'alpha': 1.57, 'a': 0.00/1000,   'd': 95.00/1000},  # Link 2
+        {'alpha': -1.57,  'a': -179.25/1000, 'd': 0.00/1000}   # Link 3
+    ]
+    
+    # Joint angles (theta2 is fixed at 0)
+    theta = [theta0, theta1, 0.0, theta3]
+    
+    def dh_matrix(alpha, a, d, theta):
+        cos_theta = math.cos(theta)
+        sin_theta = math.sin(theta)
+        cos_alpha = math.cos(alpha)
+        sin_alpha = math.sin(alpha)
+        
+        return np.array([
+            [cos_theta, -sin_theta*cos_alpha,  sin_theta*sin_alpha, a*cos_theta],
+            [sin_theta,  cos_theta*cos_alpha, -cos_theta*sin_alpha, a*sin_theta],
+            [0,          sin_alpha,            cos_alpha,           d],
+            [0,          0,                    0,                   1]
+        ])
+    
+    # Calculate transformation matrix
+    T = np.eye(4)
+    for i in range(4):
+        dh = dh_params[i]
+        T_i = dh_matrix(dh['alpha'], dh['a'], dh['d'], theta[i])
+        T = np.dot(T, T_i)
+    
+    # Extract position and convert to mm
+    position = T[:3, 3] * 1000
+    
+    return T, (position[0], position[1], position[2])
+
+def rpy_to_matrix(rpy_degrees):
+    """Convert roll-pitch-yaw in degrees to rotation matrix"""
+    if not SCIPY_AVAILABLE:
+        return None
+    return R.from_euler('xyz', rpy_degrees, degrees=True).as_matrix()
+
+def ik_objective(q, target_position, target_orientation=None, position_weight=1.0, orientation_weight=0.1):
+    """
+    Objective function for IK optimization
+    q: joint angles [theta0, theta1, theta3]
+    target_position: [x, y, z] in mm
+    target_orientation: optional 3x3 rotation matrix
+    """
+    # Get forward kinematics
+    T, current_pos = forward_kinematics(q[0], q[1], q[2])
+    
+    if T is None or current_pos is None:
+        return 1e6  # Large penalty for invalid joint angles
+    
+    # Position error
+    pos_error = np.linalg.norm(np.array(current_pos) - np.array(target_position))
+    
+    total_error = position_weight * pos_error
+    
+    # Orientation error (if specified)
+    if target_orientation is not None:
+        current_orientation = T[:3, :3]
+        rot_error = np.linalg.norm(current_orientation - target_orientation, 'fro')
+        total_error += orientation_weight * rot_error
+    
+    return total_error
+
+def compute_ik(target_x, target_y, target_z, target_rpy=None, q_guess=None, max_tries=10, position_tolerance=1.0):
+    """
+    Compute inverse kinematics for JETANK robot
+    
+    Args:
+        target_x, target_y, target_z: target position in mm
+        target_rpy: optional target orientation [rx, ry, rz] in degrees
+        q_guess: initial guess for joint angles
+        max_tries: maximum number of optimization attempts
+        position_tolerance: acceptable position error in mm
+    
+    Returns:
+        joint_angles: [theta0, theta1, theta3] in radians, or None if failed
+    """
+    if not SCIPY_AVAILABLE:
+        return None
+    
+    target_position = [target_x, target_y, target_z]
+    target_orientation = None
+    
+    if target_rpy is not None:
+        target_orientation = rpy_to_matrix(target_rpy)
+    
+    # Joint bounds
+    joint_bounds = [
+        (-1.5708, 1.5708),   # theta0
+        (0.0, 1.570796),     # theta1  
+        (-3.1418, 0.785594)  # theta3
+    ]
+    
+    # Default initial guess if none provided
+    if q_guess is None:
+        q_guess = [0.0, 0.785, -1.57]  # Middle-ish values
+    
+    best_result = None
+    best_error = float('inf')
+    
+    for attempt in range(max_tries):
+        # Add small random perturbation to initial guess for each attempt
+        if attempt > 0:
+            current_guess = q_guess + np.random.normal(0, 0.1, 3)
+            # Ensure guess is within bounds
+            for i in range(3):
+                current_guess[i] = np.clip(current_guess[i], joint_bounds[i][0], joint_bounds[i][1])
+        else:
+            current_guess = q_guess
+        
+        try:
+            # Use different optimization methods
+            methods = ['L-BFGS-B', 'SLSQP', 'trust-constr']
+            method = methods[attempt % len(methods)]
+            
+            result = minimize(
+                ik_objective, 
+                current_guess, 
+                args=(target_position, target_orientation),
+                method=method,
+                bounds=joint_bounds,
+                options={'maxiter': 1000}
+            )
+            
+            if result.success:
+                error = ik_objective(result.x, target_position, target_orientation)
+                if error < best_error:
+                    best_error = error
+                    best_result = result
+                
+                # Check if solution is good enough
+                if error < position_tolerance:
+                    print(f"IK converged on attempt {attempt + 1}")
+                    print(f"Position error: {error:.3f} mm")
+                    return result.x
+        
+        except Exception as e:
+            continue
+    
+    # Return best result found, even if not optimal
+    if best_result is not None and best_error < 10.0:  # Accept if within 10mm
+        print(f"IK converged with error: {best_error:.3f} mm")
+        return best_result.x
+    
+    print(f"IK failed to converge after {max_tries} attempts")
+    print(f"Best error achieved: {best_error:.3f} mm")
+    return None
+
+def verify_solution(joint_angles, target_position, target_rpy=None):
+    """Verify the IK solution by computing forward kinematics"""
+    if not SCIPY_AVAILABLE:
+        return False
+    
+    T, actual_pos = forward_kinematics(joint_angles[0], joint_angles[1], joint_angles[2])
+    
+    if actual_pos is None:
+        print("Invalid joint configuration!")
+        return False
+    
+    pos_error = np.linalg.norm(np.array(actual_pos) - np.array(target_position))
+    
+    print(f"\nVerification:")
+    print(f"Target position: [{target_position[0]:.2f}, {target_position[1]:.2f}, {target_position[2]:.2f}] mm")
+    print(f"Actual position: [{actual_pos[0]:.2f}, {actual_pos[1]:.2f}, {actual_pos[2]:.2f}] mm")
+    print(f"Position error: {pos_error:.3f} mm")
+    
+    if target_rpy is not None:
+        actual_rpy = R.from_matrix(T[:3, :3]).as_euler('xyz', degrees=True)
+        print(f"Target orientation: [{target_rpy[0]:.1f}, {target_rpy[1]:.1f}, {target_rpy[2]:.1f}] deg")
+        print(f"Actual orientation: [{actual_rpy[0]:.1f}, {actual_rpy[1]:.1f}, {actual_rpy[2]:.1f}] deg")
+    
+    return pos_error < 5.0  # Accept if within 5mm
+
+# Set IK functions to None if scipy is not available (so code can check if compute_ik is None)
+if not SCIPY_AVAILABLE:
     compute_ik = None
-    forward_kinematics = None
     verify_solution = None
 
 class JETANKGripperControlGUI(Node):
     def __init__(self):
         super().__init__('jetank_gripper_control_gui')
         
+        # Hardware mode: False = Fake Hardware (simulation), True = Real Hardware
+        self.use_real_hardware = False
+        self.hardware_mode_lock = threading.Lock()
+        
+        # Real hardware joint mapping (5 real joints -> 12 simulated joints)
+        # Real robot joints: base_joint, shoulder_joint, elbow_joint, wrist_joint, camera_joint
+        self.real_joint_names = ['base_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint', 'camera_joint']
+        
+        # Mapping: real joint name -> simulated joint index
+        self.real_to_sim_mapping = {
+            'base_joint': 0,       # -> revolute_BEARING
+            'shoulder_joint': 6,   # -> Revolute_SERVO_LOWER
+            'elbow_joint': 5,      # -> Revolute_SERVO_UPPER
+            'wrist_joint': None,   # -> Controls all 4 gripper joints (L1, L2, R1, R2)
+            'camera_joint': 11     # -> revolute_CAMERA_HOLDER_ARM_LOWER
+        }
+        
+        # Gripper indices controlled by wrist_joint
+        self.wrist_to_gripper_indices = [3, 4, 9, 10]  # L1, L2, R2, R1
+        
+        # Real hardware state (from servo driver)
+        self.real_joint_state = None
+        self.real_joint_state_lock = threading.Lock()
+        
         # Load joint limits from URDF
         self.joint_limits = self.load_joint_limits_from_urdf()
         
-        # Create publisher for joint states
+        # Create publisher for joint states (for RViz visualization)
         self.joint_state_pub = self.create_publisher(JointState, 'joint_states', 10)
+        
+        # Create publisher for real hardware joint commands
+        self.joint_command_pub = self.create_publisher(JointState, 'joint_commands', 10)
         
         # Create trajectory publisher
         self.trajectory_pub = self.create_publisher(JointTrajectory, 'arm_trajectory', 10)
         
         # Create velocity controller publisher
         self.velocity_pub = self.create_publisher(Float64MultiArray, '/forward_velocity_controller/commands', 10)
+        
+        # Subscriber for real hardware joint states (from servo driver)
+        # Will be created/destroyed when switching modes
+        self.real_joint_state_sub = None
         
         # Object detection data
         self.objects_data = {}  # Store latest objects data
@@ -155,6 +388,230 @@ class JETANKGripperControlGUI(Node):
         
         self.get_logger().info('JETANK Gripper Control GUI initialized')
     
+    # ==================== Real Hardware Methods ====================
+    
+    def set_hardware_mode(self, use_real):
+        """Switch between fake and real hardware modes"""
+        with self.hardware_mode_lock:
+            if use_real == self.use_real_hardware:
+                return  # No change needed
+            
+            self.use_real_hardware = use_real
+            
+            if use_real:
+                # Switch to real hardware mode
+                self.get_logger().info('Switching to REAL hardware mode')
+                # Create subscriber for real joint states from servo driver
+                if self.real_joint_state_sub is None:
+                    self.real_joint_state_sub = self.create_subscription(
+                        JointState,
+                        'real_joint_states',  # From servo driver
+                        self.real_joint_state_callback,
+                        10
+                    )
+                self.update_status("Mode: Real Hardware")
+            else:
+                # Switch to fake hardware mode
+                self.get_logger().info('Switching to FAKE hardware mode')
+                # Destroy real joint state subscriber
+                if self.real_joint_state_sub is not None:
+                    self.destroy_subscription(self.real_joint_state_sub)
+                    self.real_joint_state_sub = None
+                self.update_status("Mode: Fake Hardware")
+    
+    def real_joint_state_callback(self, msg):
+        """Callback for receiving joint states from real hardware (servo driver)"""
+        with self.real_joint_state_lock:
+            self.real_joint_state = msg
+        
+        # Map real joint states to simulated joint states for RViz
+        if self.use_real_hardware:
+            self.map_real_to_simulated_joints(msg)
+    
+    def map_real_to_simulated_joints(self, real_msg):
+        """Map 5 real robot joints to 12 simulated joints for RViz visualization"""
+        # Create mapping from joint name to position
+        real_positions = {}
+        for i, name in enumerate(real_msg.name):
+            if i < len(real_msg.position):
+                real_positions[name] = real_msg.position[i]
+        
+        # Map to simulated joints
+        positions = list(self.joint_state.position)
+        
+        # Store real positions for GUI slider updates
+        base_pos = None
+        shoulder_pos = None
+        elbow_pos = None
+        camera_pos = None
+        wrist_pos = None
+        
+        for real_name, sim_index in self.real_to_sim_mapping.items():
+            if real_name in real_positions:
+                if sim_index is not None:
+                    # Direct mapping
+                    positions[sim_index] = real_positions[real_name]
+                    # Store for GUI updates
+                    if real_name == 'base_joint':
+                        base_pos = real_positions[real_name]
+                    elif real_name == 'shoulder_joint':
+                        shoulder_pos = real_positions[real_name]
+                    elif real_name == 'elbow_joint':
+                        elbow_pos = real_positions[real_name]
+                    elif real_name == 'camera_joint':
+                        camera_pos = real_positions[real_name]
+                elif real_name == 'wrist_joint':
+                    # Wrist joint controls all 4 gripper joints
+                    wrist_pos = real_positions[real_name]
+                    wrist_angle = real_positions[real_name]
+                    # Map wrist angle to gripper positions
+                    # L1 and L2 are negative, R1 is positive, R2 is negative
+                    gripper_angle = self.wrist_to_gripper_angle(wrist_angle)
+                    positions[3] = -abs(gripper_angle)  # L1 (negative)
+                    positions[4] = -abs(gripper_angle)  # L2 (negative)
+                    positions[9] = -abs(gripper_angle)  # R2 (negative)
+                    positions[10] = abs(gripper_angle)  # R1 (positive)
+        
+        # Update joint state
+        self.joint_state.position = positions
+        
+        # Update GUI sliders thread-safely (only in real mode)
+        if self.use_real_hardware and hasattr(self, 'root') and self.root.winfo_exists():
+            self.root.after(0, self.update_sliders_from_real_state, 
+                          base_pos, shoulder_pos, elbow_pos, camera_pos, wrist_pos)
+    
+    def update_sliders_from_real_state(self, base_pos, shoulder_pos, elbow_pos, camera_pos, wrist_pos):
+        """Update GUI sliders from real robot joint states (called from main thread)"""
+        try:
+            # Update arm sliders
+            if base_pos is not None and hasattr(self, 'bearing_var'):
+                self.bearing_var.set(base_pos)
+                if hasattr(self, 'bearing_label'):
+                    self.bearing_label.config(text=f"{base_pos:.3f}")
+            
+            if shoulder_pos is not None and hasattr(self, 'servo_lower_var'):
+                self.servo_lower_var.set(shoulder_pos)
+                if hasattr(self, 'servo_lower_label'):
+                    self.servo_lower_label.config(text=f"{shoulder_pos:.3f}")
+            
+            if elbow_pos is not None and hasattr(self, 'servo_upper_var'):
+                self.servo_upper_var.set(elbow_pos)
+                if hasattr(self, 'servo_upper_label'):
+                    self.servo_upper_label.config(text=f"{elbow_pos:.3f}")
+            
+            if camera_pos is not None and hasattr(self, 'camera_tilt_var'):
+                self.camera_tilt_var.set(camera_pos)
+                if hasattr(self, 'camera_tilt_label'):
+                    degrees = math.degrees(camera_pos)
+                    self.camera_tilt_label.config(text=f"{camera_pos:.3f} rad ({degrees:.1f}°)")
+            
+            # Update gripper slider from wrist position
+            if wrist_pos is not None:
+                # Convert wrist angle to gripper servo value (0.0 to 1.22)
+                gripper_angle = self.wrist_to_gripper_angle(wrist_pos)
+                max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
+                if max_angle > 0:
+                    # Convert gripper angle to servo value: servo_value = (gripper_angle / max_angle) * 1.22
+                    servo_value = (abs(gripper_angle) / max_angle) * 1.22
+                    servo_value = max(0.0, min(1.22, servo_value))  # Clamp to [0, 1.22]
+                    
+                    if hasattr(self, 'gripper_var'):
+                        self.gripper_var.set(servo_value)
+                    if hasattr(self, 'gripper_label'):
+                        status = "Open" if servo_value > 0.1 else "Closed"
+                        self.gripper_label.config(text=f"{servo_value:.3f} ({status})")
+                    
+                    # Update individual gripper sliders if they exist
+                    gripper_angle_abs = abs(gripper_angle)
+                    if hasattr(self, 'left_l1_var'):
+                        self.left_l1_var.set(-gripper_angle_abs)
+                        self.left_l2_var.set(-gripper_angle_abs)
+                    if hasattr(self, 'right_r1_var'):
+                        self.right_r1_var.set(gripper_angle_abs)
+                        self.right_r2_var.set(-gripper_angle_abs)
+                    if hasattr(self, 'left_l1_label'):
+                        self.left_l1_label.config(text=f"{-gripper_angle_abs:.3f}")
+                        self.left_l2_label.config(text=f"{-gripper_angle_abs:.3f}")
+                    if hasattr(self, 'right_r1_label'):
+                        self.right_r1_label.config(text=f"{gripper_angle_abs:.3f}")
+                        self.right_r2_label.config(text=f"{-gripper_angle_abs:.3f}")
+        except Exception as e:
+            # Silently ignore GUI update errors (sliders might not exist yet)
+            pass
+    
+    def wrist_to_gripper_angle(self, wrist_angle):
+        """Convert wrist servo angle to gripper finger angles"""
+        # The wrist servo controls the gripper opening/closing
+        # Map wrist angle range to gripper angle range
+        # Adjust this mapping based on your specific hardware
+        # Assuming wrist range maps to gripper range [-1.047, 0]
+        gripper_max = 1.047198
+        # Normalize wrist angle and scale to gripper range
+        gripper_angle = wrist_angle * gripper_max / (math.pi / 2)
+        return max(-gripper_max, min(gripper_max, gripper_angle))
+    
+    def gripper_to_wrist_angle(self, gripper_angle):
+        """Convert gripper finger angle to wrist servo angle"""
+        # Reverse of wrist_to_gripper_angle
+        gripper_max = 1.047198
+        wrist_angle = gripper_angle * (math.pi / 2) / gripper_max
+        return wrist_angle
+    
+    def send_real_hardware_command(self, joint_name, position, velocity=None):
+        """Send joint command to real hardware"""
+        if not self.use_real_hardware:
+            return
+        
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = [joint_name]
+        msg.position = [position]
+        if velocity is not None:
+            msg.velocity = [velocity]
+        
+        self.joint_command_pub.publish(msg)
+        self.get_logger().info(f'Sent command to {joint_name}: {position:.3f} rad')
+    
+    def send_arm_command_real(self, bearing, shoulder, elbow):
+        """Send arm joint commands to real hardware (sends each joint separately)"""
+        if not self.use_real_hardware:
+            return
+        
+        # Send each joint separately (same as slider behavior)
+        self.send_real_hardware_command('base_joint', bearing)
+        self.send_real_hardware_command('shoulder_joint', shoulder)
+        self.send_real_hardware_command('elbow_joint', elbow)
+        
+        self.get_logger().info(f'Sent arm command: base={bearing:.3f}, shoulder={shoulder:.3f}, elbow={elbow:.3f}')
+    
+    def send_gripper_command_real(self, wrist_angle):
+        """Send gripper (wrist) command to real hardware"""
+        if not self.use_real_hardware:
+            return
+        
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = ['wrist_joint']
+        msg.position = [wrist_angle]
+        
+        self.joint_command_pub.publish(msg)
+        self.get_logger().info(f'Sent gripper command: wrist={wrist_angle:.3f}')
+    
+    def send_camera_command_real(self, camera_angle):
+        """Send camera tilt command to real hardware"""
+        if not self.use_real_hardware:
+            return
+        
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.name = ['camera_joint']
+        msg.position = [camera_angle]
+        
+        self.joint_command_pub.publish(msg)
+        self.get_logger().info(f'Sent camera command: {camera_angle:.3f}')
+    
+    # ==================== End Real Hardware Methods ====================
+    
     def load_joint_limits_from_urdf(self):
         """Load joint limits from URDF file dynamically"""
         joint_limits = {}
@@ -249,7 +706,28 @@ class JETANKGripperControlGUI(Node):
         # Title
         title_label = ttk.Label(main_frame, text="JETANK Gripper Control", 
                                font=('Arial', 16, 'bold'))
-        title_label.pack(pady=(0, 20))
+        title_label.pack(pady=(0, 10))
+        
+        # Hardware Mode Selector
+        hardware_frame = ttk.LabelFrame(main_frame, text="Hardware Mode", padding="5")
+        hardware_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.hardware_mode_var = tk.StringVar(value="fake")
+        
+        fake_radio = ttk.Radiobutton(hardware_frame, text="Fake Hardware (Simulation)", 
+                                     variable=self.hardware_mode_var, value="fake",
+                                     command=self.on_hardware_mode_change)
+        fake_radio.pack(side=tk.LEFT, padx=10)
+        
+        real_radio = ttk.Radiobutton(hardware_frame, text="Real Hardware", 
+                                     variable=self.hardware_mode_var, value="real",
+                                     command=self.on_hardware_mode_change)
+        real_radio.pack(side=tk.LEFT, padx=10)
+        
+        # Hardware status indicator
+        self.hardware_status_label = ttk.Label(hardware_frame, text="● Fake", 
+                                              foreground="blue", font=('Arial', 9, 'bold'))
+        self.hardware_status_label.pack(side=tk.RIGHT, padx=10)
         
         # Create notebook for tabs
         self.notebook = ttk.Notebook(main_frame)
@@ -689,21 +1167,36 @@ class JETANKGripperControlGUI(Node):
         """Handle bearing slider change"""
         pos = float(value)
         self.bearing_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.arm_joint_indices['BEARING']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.arm_joint_indices['BEARING']] = pos
+        else:
+            # In real mode, only send command - visualization comes from real robot
+            self.send_real_hardware_command('base_joint', pos)
         self.update_status(f"Base Bearing: {pos:.3f}")
         
     def on_servo_lower_change(self, value):
         """Handle lower servo slider change"""
         pos = float(value)
         self.servo_lower_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = pos
+        else:
+            # In real mode, only send command - visualization comes from real robot
+            self.send_real_hardware_command('shoulder_joint', pos)
         self.update_status(f"Lower Servo: {pos:.3f}")
         
     def on_servo_upper_change(self, value):
         """Handle upper servo slider change"""
         pos = float(value)
         self.servo_upper_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = pos
+        else:
+            # In real mode, only send command - visualization comes from real robot
+            self.send_real_hardware_command('elbow_joint', pos)
         self.update_status(f"Upper Servo: {pos:.3f}")
     
     def on_camera_tilt_change(self, value):
@@ -711,7 +1204,12 @@ class JETANKGripperControlGUI(Node):
         pos = float(value)
         degrees = math.degrees(pos)
         self.camera_tilt_label.config(text=f"{pos:.3f} rad ({degrees:.1f}°)")
-        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = pos
+        else:
+            # In real mode, only send command - visualization comes from real robot
+            self.send_real_hardware_command('camera_joint', pos)
         self.update_status(f"Camera Tilt: {pos:.3f} rad ({degrees:.1f}°)")
         
     def move_to_position(self):
@@ -799,20 +1297,29 @@ class JETANKGripperControlGUI(Node):
                     theta1 = joint_angles[1]  # Revolute_SERVO_LOWER  
                     theta3 = joint_angles[2]  # Revolute_SERVO_UPPER
                     
-                    # Update GUI sliders and joint positions
-                    self.bearing_var.set(theta0)
-                    self.servo_lower_var.set(theta1)
-                    self.servo_upper_var.set(theta3)
-                    
-                    # Update joint state message
-                    self.joint_state.position[self.arm_joint_indices['BEARING']] = theta0
-                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = theta1
-                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = theta3
-                    
                     # Update labels
                     self.bearing_label.config(text=f"{theta0:.3f}")
                     self.servo_lower_label.config(text=f"{theta1:.3f}")
                     self.servo_upper_label.config(text=f"{theta3:.3f}")
+                    
+                    if not self.use_real_hardware:
+                        # Fake mode: Update GUI sliders and joint positions
+                        self.bearing_var.set(theta0)
+                        self.servo_lower_var.set(theta1)
+                        self.servo_upper_var.set(theta3)
+                        
+                        # Update joint state message
+                        self.joint_state.position[self.arm_joint_indices['BEARING']] = theta0
+                        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = theta1
+                        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = theta3
+                    else:
+                        # Real mode: Only send commands, don't update joint_state
+                        # Visualization comes from real robot feedback
+                        self.send_arm_command_real(theta0, theta1, theta3)
+                        # Update sliders for display only (callbacks won't update joint_state in real mode)
+                        self.bearing_var.set(theta0)
+                        self.servo_lower_var.set(theta1)
+                        self.servo_upper_var.set(theta3)
                     
                     # Verify the solution by computing forward kinematics
                     T, actual_pos = forward_kinematics(theta0, theta1, theta3)
@@ -909,20 +1416,29 @@ class JETANKGripperControlGUI(Node):
                 self.update_status(f"Error: {str(e)}")
         else:
             # Use instant reset (arm only, camera not affected)
-            # Reset arm joints to default positions
-            self.bearing_var.set(0.0)
-            self.servo_lower_var.set(0.0)
-            self.servo_upper_var.set(0.0)
-            
-            # Update joint positions (arm only)
-            self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
-            self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
-            self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
-            
             # Update labels
             self.bearing_label.config(text="0.000")
             self.servo_lower_label.config(text="0.000")
             self.servo_upper_label.config(text="0.000")
+            
+            if not self.use_real_hardware:
+                # Fake mode: Update GUI sliders and joint positions
+                self.bearing_var.set(0.0)
+                self.servo_lower_var.set(0.0)
+                self.servo_upper_var.set(0.0)
+                
+                # Update joint positions (arm only)
+                self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
+                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
+                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+            else:
+                # Real mode: Only send commands, don't update joint_state
+                # Visualization comes from real robot feedback
+                self.send_arm_command_real(0.0, 0.0, 0.0)
+                # Update sliders for display only (callbacks won't update joint_state in real mode)
+                self.bearing_var.set(0.0)
+                self.servo_lower_var.set(0.0)
+                self.servo_upper_var.set(0.0)
             
             self.error_text.insert(tk.END, "Arm reset to home position (camera unchanged)\n")
             self.error_text.see(tk.END)
@@ -972,8 +1488,14 @@ class JETANKGripperControlGUI(Node):
         else:
             # Use instant movement
             self.camera_tilt_var.set(target_angle)
-            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
             self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (-30.0°)")
+            
+            # Only update internal state in fake hardware mode
+            if not self.use_real_hardware:
+                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+            else:
+                # In real mode, send command to camera
+                self.send_real_hardware_command('camera_joint', target_angle)
             
             self.error_text.insert(tk.END, f"Camera moved to -30.0°\n")
             self.error_text.see(tk.END)
@@ -1022,8 +1544,14 @@ class JETANKGripperControlGUI(Node):
         else:
             # Use instant movement
             self.camera_tilt_var.set(target_angle)
-            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
             self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (0.0°)")
+            
+            # Only update internal state in fake hardware mode
+            if not self.use_real_hardware:
+                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+            else:
+                # In real mode, send command to camera
+                self.send_real_hardware_command('camera_joint', target_angle)
             
             self.error_text.insert(tk.END, f"Camera reset to 0.0°\n")
             self.error_text.see(tk.END)
@@ -1077,6 +1605,7 @@ class JETANKGripperControlGUI(Node):
             
             # Update GUI in real-time during trajectory execution
             start_time = time.time()
+            iteration_count = 0
             while time.time() - start_time < duration and self.trajectory_active:
                 elapsed = time.time() - start_time
                 t = min(1.0, elapsed / duration)
@@ -1088,26 +1617,38 @@ class JETANKGripperControlGUI(Node):
                     pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
                     current_positions.append(pos)
                 
-                # Update joint state
-                self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
-                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
-                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                # In fake mode, update joint state for visualization
+                # In real mode, only send commands - visualization comes from real robot
+                if not self.use_real_hardware:
+                    self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                    
+                    # Update GUI sliders (thread-safe) - only in fake mode
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_trajectory, current_positions)
+                else:
+                    # Send to real hardware at lower rate (every 5th iteration = 10Hz)
+                    if iteration_count % 5 == 0:
+                        self.send_arm_command_real(current_positions[0], current_positions[1], current_positions[2])
                 
-                # Update GUI sliders (thread-safe)
-                if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_trajectory, current_positions)
-                
-                time.sleep(0.02)  # 50Hz update rate
+                iteration_count += 1
+                time.sleep(0.02)  # 50Hz GUI update rate
             
             # Ensure final position is set
             if self.trajectory_active:
-                self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
-                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
-                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
-                
-                # Update GUI to final position
-                if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_trajectory, target_joints)
+                if not self.use_real_hardware:
+                    # Fake mode: update joint state and GUI
+                    self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
+                    
+                    # Update GUI to final position
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_trajectory, target_joints)
+                else:
+                    # Real mode: only send final command
+                    self.send_arm_command_real(target_joints[0], target_joints[1], target_joints[2])
                 
                 # Verify final position
                 T, actual_pos = forward_kinematics(target_joints[0], target_joints[1], target_joints[2])
@@ -1192,6 +1733,7 @@ class JETANKGripperControlGUI(Node):
             
             # Update GUI in real-time during trajectory execution
             start_time = time.time()
+            iteration_count = 0
             while time.time() - start_time < duration and self.trajectory_active:
                 elapsed = time.time() - start_time
                 t = min(1.0, elapsed / duration)
@@ -1203,26 +1745,41 @@ class JETANKGripperControlGUI(Node):
                     pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
                     current_positions.append(pos)
                 
-                # Update joint state (arm only, camera not affected)
-                self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
-                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
-                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                # In fake mode, update joint state and GUI
+                # In real mode, only send commands - visualization comes from real robot
+                if not self.use_real_hardware:
+                    # Update joint state (arm only, camera not affected)
+                    self.joint_state.position[self.arm_joint_indices['BEARING']] = current_positions[0]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = current_positions[1]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = current_positions[2]
+                    
+                    # Update GUI sliders (thread-safe) - only in fake mode
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_reset_trajectory, current_positions)
+                else:
+                    # Send to real hardware at lower rate (every 5th iteration = 10Hz)
+                    if iteration_count % 5 == 0:
+                        self.send_arm_command_real(current_positions[0], current_positions[1], current_positions[2])
                 
-                # Update GUI sliders (thread-safe)
-                if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_reset_trajectory, current_positions)
-                
+                iteration_count += 1
                 time.sleep(0.02)  # 50Hz update rate
             
             # Ensure final position is set
             if self.trajectory_active:
-                self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
-                self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
-                self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
+                if not self.use_real_hardware:
+                    # Fake mode: update joint state and GUI
+                    self.joint_state.position[self.arm_joint_indices['BEARING']] = target_joints[0]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = target_joints[1]
+                    self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = target_joints[2]
+                    
+                    # Update GUI to final position
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_reset_trajectory, target_joints)
+                else:
+                    # Real mode: send final command
+                    self.send_arm_command_real(target_joints[0], target_joints[1], target_joints[2])
                 
-                # Update GUI to final position
                 if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_reset_trajectory, target_joints)
                     self.root.after(0, self.reset_trajectory_completed)
             
         except Exception as e:
@@ -1268,6 +1825,7 @@ class JETANKGripperControlGUI(Node):
             
             # Update GUI in real-time during trajectory execution
             start_time = time.time()
+            iteration_count = 0
             while time.time() - start_time < duration and self.trajectory_active:
                 elapsed = time.time() - start_time
                 t = min(1.0, elapsed / duration)
@@ -1278,22 +1836,37 @@ class JETANKGripperControlGUI(Node):
                 # Calculate current camera angle
                 current_angle = start_angle + (target_angle - start_angle) * t_smooth
                 
-                # Update joint state
-                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = current_angle
+                # In fake mode, update joint state and GUI
+                # In real mode, only send commands - visualization comes from real robot
+                if not self.use_real_hardware:
+                    # Update joint state
+                    self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = current_angle
+                    
+                    # Update GUI slider (thread-safe)
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_camera_trajectory, current_angle)
+                else:
+                    # Send to real hardware at lower rate (every 5th iteration = 10Hz)
+                    if iteration_count % 5 == 0:
+                        self.send_real_hardware_command('camera_joint', current_angle)
                 
-                # Update GUI slider (thread-safe)
-                if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_camera_trajectory, current_angle)
-                
+                iteration_count += 1
                 time.sleep(0.02)  # 50Hz update rate
             
             # Ensure final position is set
             if self.trajectory_active:
-                self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+                if not self.use_real_hardware:
+                    # Fake mode: update joint state and GUI
+                    self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = target_angle
+                    
+                    # Update GUI to final position
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gui_during_camera_trajectory, target_angle)
+                else:
+                    # Real mode: send final command
+                    self.send_real_hardware_command('camera_joint', target_angle)
                 
-                # Update GUI to final position
                 if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gui_during_camera_trajectory, target_angle)
                     self.root.after(0, self.camera_trajectory_completed)
             
         except Exception as e:
@@ -1402,11 +1975,12 @@ class JETANKGripperControlGUI(Node):
                             pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
                             current_positions.append(pos)
                         
-                        # Update joint state to current position (hold at threshold position)
-                        self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
-                        self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
-                        self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
-                        self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
+                        # Update joint state to current position (hold at threshold position) - only in fake mode
+                        if not self.use_real_hardware:
+                            self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
+                            self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
+                            self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
+                            self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
                         
                         # Notify GUI about threshold reached
                         if hasattr(self, 'root') and self.root.winfo_exists():
@@ -1454,28 +2028,46 @@ class JETANKGripperControlGUI(Node):
                     pos = start_joints[j] + (target_joints[j] - start_joints[j]) * t_smooth
                     current_positions.append(pos)
                 
-                # Update joint state
-                self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
-                self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
-                self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
-                self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
-                
-                # Update GUI sliders (thread-safe)
-                if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gripper_gui_during_trajectory, current_positions)
+                # In fake mode, update joint state and GUI
+                # In real mode, only send commands - visualization comes from real robot
+                if not self.use_real_hardware:
+                    # Update joint state
+                    self.joint_state.position[self.gripper_joint_indices['L1']] = current_positions[0]
+                    self.joint_state.position[self.gripper_joint_indices['L2']] = current_positions[1]
+                    self.joint_state.position[self.gripper_joint_indices['R1']] = current_positions[2]
+                    self.joint_state.position[self.gripper_joint_indices['R2']] = current_positions[3]
+                    
+                    # Update GUI sliders (thread-safe) - only in fake mode
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gripper_gui_during_trajectory, current_positions)
+                else:
+                    # Send to real hardware
+                    # Use R1 position to calculate wrist angle
+                    gripper_angle = abs(current_positions[2])  # R1 is index 2
+                    wrist_angle = self.gripper_to_wrist_angle(gripper_angle)
+                    self.send_gripper_command_real(wrist_angle)
                 
                 time.sleep(0.02)  # 50Hz update rate
             
             # Ensure final position is set
             if self.trajectory_active:
-                self.joint_state.position[self.gripper_joint_indices['L1']] = target_joints[0]
-                self.joint_state.position[self.gripper_joint_indices['L2']] = target_joints[1]
-                self.joint_state.position[self.gripper_joint_indices['R1']] = target_joints[2]
-                self.joint_state.position[self.gripper_joint_indices['R2']] = target_joints[3]
+                if not self.use_real_hardware:
+                    # Fake mode: update joint state and GUI
+                    self.joint_state.position[self.gripper_joint_indices['L1']] = target_joints[0]
+                    self.joint_state.position[self.gripper_joint_indices['L2']] = target_joints[1]
+                    self.joint_state.position[self.gripper_joint_indices['R1']] = target_joints[2]
+                    self.joint_state.position[self.gripper_joint_indices['R2']] = target_joints[3]
+                    
+                    # Update GUI to final position
+                    if hasattr(self, 'root') and self.root.winfo_exists():
+                        self.root.after(0, self.update_gripper_gui_during_trajectory, target_joints)
+                else:
+                    # Real mode: send final command
+                    gripper_angle = abs(target_joints[2])  # R1 is index 2
+                    wrist_angle = self.gripper_to_wrist_angle(gripper_angle)
+                    self.send_gripper_command_real(wrist_angle)
                 
-                # Update GUI to final position
                 if hasattr(self, 'root') and self.root.winfo_exists():
-                    self.root.after(0, self.update_gripper_gui_during_trajectory, target_joints)
                     self.root.after(0, self.gripper_trajectory_completed)
             
         except Exception as e:
@@ -1485,7 +2077,8 @@ class JETANKGripperControlGUI(Node):
             self.trajectory_active = False
             
     def update_gripper_gui_during_trajectory(self, joint_positions):
-        """Update gripper GUI sliders during trajectory execution (called from main thread)"""
+        """Update gripper GUI sliders during trajectory execution (called from main thread)
+        Note: This should only be called in fake hardware mode"""
         try:
             # Update sliders with proper mappings
             l1_pos = joint_positions[0]
@@ -1502,11 +2095,12 @@ class JETANKGripperControlGUI(Node):
             if hasattr(self, 'gripper_var'):
                 self.gripper_var.set(servo_value)
             
-            # Update joint state
-            self.joint_state.position[self.gripper_joint_indices['L1']] = l1_pos
-            self.joint_state.position[self.gripper_joint_indices['L2']] = l2_pos
-            self.joint_state.position[self.gripper_joint_indices['R1']] = r1_pos
-            self.joint_state.position[self.gripper_joint_indices['R2']] = r2_pos
+            # Only update joint state in fake hardware mode
+            if not self.use_real_hardware:
+                self.joint_state.position[self.gripper_joint_indices['L1']] = l1_pos
+                self.joint_state.position[self.gripper_joint_indices['L2']] = l2_pos
+                self.joint_state.position[self.gripper_joint_indices['R1']] = r1_pos
+                self.joint_state.position[self.gripper_joint_indices['R2']] = r2_pos
             
             # Update unified gripper label (show servo value)
             if hasattr(self, 'gripper_label'):
@@ -1679,28 +2273,36 @@ class JETANKGripperControlGUI(Node):
         """Handle left L1 slider change"""
         pos = float(value)
         self.left_l1_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.gripper_joint_indices['L1']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.gripper_joint_indices['L1']] = pos
         self.update_status(f"Left L1: {pos:.3f}")
         
     def on_left_l2_change(self, value):
         """Handle left L2 slider change"""
         pos = float(value)
         self.left_l2_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.gripper_joint_indices['L2']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.gripper_joint_indices['L2']] = pos
         self.update_status(f"Left L2: {pos:.3f}")
         
     def on_right_r1_change(self, value):
         """Handle right R1 slider change"""
         pos = float(value)
         self.right_r1_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.gripper_joint_indices['R1']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.gripper_joint_indices['R1']] = pos
         self.update_status(f"Right R1: {pos:.3f}")
         
     def on_right_r2_change(self, value):
         """Handle right R2 slider change"""
         pos = float(value)
         self.right_r2_label.config(text=f"{pos:.3f}")
-        self.joint_state.position[self.gripper_joint_indices['R2']] = pos
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.gripper_joint_indices['R2']] = pos
         self.update_status(f"Right R2: {pos:.3f}")
         
     def on_gripper_change(self, value):
@@ -1716,16 +2318,21 @@ class JETANKGripperControlGUI(Node):
         
         # Left side: both L1 and L2 get negative value
         left_pos = -joint_angle
-        self.joint_state.position[self.gripper_joint_indices['L1']] = left_pos
-        self.joint_state.position[self.gripper_joint_indices['L2']] = left_pos
-        
-        # Right side: R1 gets positive value, R2 gets negative value
         right_r1_pos = joint_angle
         right_r2_pos = -joint_angle
-        self.joint_state.position[self.gripper_joint_indices['R1']] = right_r1_pos
-        self.joint_state.position[self.gripper_joint_indices['R2']] = right_r2_pos
         
-        # Update individual sliders if they exist
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            self.joint_state.position[self.gripper_joint_indices['L1']] = left_pos
+            self.joint_state.position[self.gripper_joint_indices['L2']] = left_pos
+            self.joint_state.position[self.gripper_joint_indices['R1']] = right_r1_pos
+            self.joint_state.position[self.gripper_joint_indices['R2']] = right_r2_pos
+        else:
+            # In real mode, only send command - visualization comes from real robot
+            wrist_angle = self.gripper_to_wrist_angle(joint_angle)
+            self.send_gripper_command_real(wrist_angle)
+        
+        # Update individual sliders if they exist (for display only)
         if hasattr(self, 'left_l1_var'):
             self.left_l1_var.set(left_pos)
             self.left_l2_var.set(left_pos)
@@ -1802,10 +2409,17 @@ class JETANKGripperControlGUI(Node):
             
             # Update joint positions with proper mappings - use dynamic limits from URDF
             max_angle = self.get_joint_limit('Revolute_GRIPPER_R1', 'upper')
-            self.joint_state.position[self.gripper_joint_indices['L1']] = -max_angle  # L1
-            self.joint_state.position[self.gripper_joint_indices['L2']] = -max_angle  # L2
-            self.joint_state.position[self.gripper_joint_indices['R1']] = max_angle   # R1 (direct mapping)
-            self.joint_state.position[self.gripper_joint_indices['R2']] = -max_angle  # R2 (inverted mapping)
+            
+            # Only update internal state in fake hardware mode
+            if not self.use_real_hardware:
+                self.joint_state.position[self.gripper_joint_indices['L1']] = -max_angle  # L1
+                self.joint_state.position[self.gripper_joint_indices['L2']] = -max_angle  # L2
+                self.joint_state.position[self.gripper_joint_indices['R1']] = max_angle   # R1 (direct mapping)
+                self.joint_state.position[self.gripper_joint_indices['R2']] = -max_angle  # R2 (inverted mapping)
+            else:
+                # In real mode, send command to open gripper
+                wrist_angle = self.gripper_to_wrist_angle(max_angle)
+                self.send_gripper_command_real(wrist_angle)
             
             # Update gripper label
             if hasattr(self, 'gripper_label'):
@@ -1825,6 +2439,11 @@ class JETANKGripperControlGUI(Node):
                 self.simple_right_label.config(text=f"{max_angle:.3f} (Open)")
             
             self.update_status("Gripper opened (simple control)")
+            
+            # Send to real hardware if in real mode
+            if self.use_real_hardware:
+                wrist_angle = self.gripper_to_wrist_angle(max_angle)
+                self.send_gripper_command_real(wrist_angle)
         
     def close_gripper(self):
         """Close gripper using simple controls"""
@@ -1887,15 +2506,20 @@ class JETANKGripperControlGUI(Node):
             if hasattr(self, 'gripper_var'):
                 self.gripper_var.set(0.0)
             
-            # Update joint positions
-            self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0  # L1
-            self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0  # L2
-            self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0  # R1
+            # Only update internal state in fake hardware mode
+            if not self.use_real_hardware:
+                # Update joint positions
+                self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0  # L1
+                self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0  # L2
+                self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0  # R1
+                self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0  # R2
+            else:
+                # In real mode, send command to close gripper
+                self.send_gripper_command_real(0.0)  # 0 = closed
             
             # Update gripper label
             if hasattr(self, 'gripper_label'):
                 self.gripper_label.config(text="0.000 (Closed)")
-            self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0  # R2
             
             # Update individual tab sliders if they exist
             if hasattr(self, 'left_l1_var'):
@@ -1913,17 +2537,11 @@ class JETANKGripperControlGUI(Node):
         
     def reset_gripper(self):
         """Reset gripper and arm to default position"""
-        # Reset gripper joints to closed position
+        # Reset gripper joints to closed position (GUI sliders)
         self.left_l1_var.set(0.0)
         self.left_l2_var.set(0.0)
         self.right_r1_var.set(0.0)
         self.right_r2_var.set(0.0)
-        
-        # Update joint positions
-        self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0
-        self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0
-        self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0
-        self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0
         
         # Update labels
         self.left_l1_label.config(text="0.000")
@@ -1931,19 +2549,34 @@ class JETANKGripperControlGUI(Node):
         self.right_r1_label.config(text="0.000")
         self.right_r2_label.config(text="0.000")
         
-        # Reset arm joints
+        # Reset arm joints (GUI sliders)
         self.bearing_var.set(0.0)
         self.servo_lower_var.set(0.0)
         self.servo_upper_var.set(0.0)
         
-        # Reset camera tilt
+        # Reset camera tilt (GUI slider)
         self.camera_tilt_var.set(0.0)
         
-        # Update joint positions
-        self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
-        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
-        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
-        self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
+        # Only update internal state in fake hardware mode
+        if not self.use_real_hardware:
+            # Update gripper joint positions
+            self.joint_state.position[self.gripper_joint_indices['L1']] = 0.0
+            self.joint_state.position[self.gripper_joint_indices['L2']] = 0.0
+            self.joint_state.position[self.gripper_joint_indices['R1']] = 0.0
+            self.joint_state.position[self.gripper_joint_indices['R2']] = 0.0
+            
+            # Update arm joint positions
+            self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
+            self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
+            self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+            self.joint_state.position[self.camera_joint_indices['CAMERA_TILT']] = 0.0
+        else:
+            # In real mode, send commands to reset all joints
+            self.send_real_hardware_command('base_joint', 0.0)
+            self.send_real_hardware_command('shoulder_joint', 0.0)
+            self.send_real_hardware_command('elbow_joint', 0.0)
+            self.send_real_hardware_command('camera_joint', 0.0)
+            self.send_gripper_command_real(0.0)  # Close gripper
         
         # Update labels
         self.bearing_label.config(text="0.000")
@@ -1952,6 +2585,12 @@ class JETANKGripperControlGUI(Node):
         self.camera_tilt_label.config(text="0.000 rad (0.0°)")
         
         self.update_status("Gripper, arm, and camera reset")
+        
+        # Send to real hardware if in real mode
+        if self.use_real_hardware:
+            self.send_arm_command_real(0.0, 0.0, 0.0)
+            self.send_gripper_command_real(0.0)
+            self.send_camera_command_real(0.0)
         
     def move_forward(self):
         """Send forward motion command"""
@@ -2144,6 +2783,23 @@ class JETANKGripperControlGUI(Node):
             self.error_text.see(tk.END)
             self.update_status(f"Error: {str(e)}")
     
+    def on_hardware_mode_change(self):
+        """Handle hardware mode selection change"""
+        mode = self.hardware_mode_var.get()
+        use_real = (mode == "real")
+        
+        # Update hardware mode
+        self.set_hardware_mode(use_real)
+        
+        # Update status indicator
+        if hasattr(self, 'hardware_status_label'):
+            if use_real:
+                self.hardware_status_label.config(text="● Real", foreground="green")
+            else:
+                self.hardware_status_label.config(text="● Fake", foreground="blue")
+        
+        self.get_logger().info(f'Hardware mode changed to: {mode}')
+    
     def update_status(self, message):
         """Update status label"""
         if hasattr(self, 'status_label'):
@@ -2192,4 +2848,9 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
 

@@ -42,6 +42,18 @@ def generate_launch_description():
         ]
     )
 
+    # Servo Driver - controls the 5 servos on the real robot
+    # Remap joint_states to real_joint_states so GUI can subscribe
+    servo_driver_node = Node(
+        package='jetank_control',
+        executable='servo',
+        name='servo_driver',
+        output='screen',
+        remappings=[
+            ('joint_states', 'real_joint_states'),  # Servo publishes real state here
+        ]
+    )
+
     # JETANK Control GUI
     jetank_control_gui_node = Node(
         package='JETANK_description',
@@ -103,9 +115,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         robot_state_publisher_node,
+        servo_driver_node,
         jetank_control_gui_node,
         ee_pose_publisher_node,
         camera_pose_publisher_node,
         camera_to_ee_pose_publisher_node,
         rviz_node
     ])
+
