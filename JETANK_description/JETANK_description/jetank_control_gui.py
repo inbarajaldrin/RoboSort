@@ -7,7 +7,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from std_msgs.msg import Float64MultiArray, Float32
 from rosgraph_msgs.msg import Clock
-from max_camera_msgs.msg import ObjectPoseArray, ObjectPose
+from tf2_msgs.msg import TFMessage
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -288,7 +288,7 @@ class JETANKGripperControlGUI(Node):
         
         # Create subscriber for object poses
         self.objects_sub = self.create_subscription(
-            ObjectPoseArray,
+            TFMessage,
             '/objects_poses',
             self.objects_callback,
             10
@@ -2170,9 +2170,7 @@ class JETANKGripperControlGUI(Node):
     def get_gripper_pose(self):
         """Get gripper pose using tf2_echo command"""
         try:
-            # Set ROS domain ID
             import os
-            os.environ['ROS_DOMAIN_ID'] = '6'
             
             # Run tf2_echo command to get pose from BEARING_1 to GRIPPER_CENTER_LINK
             cmd = ["ros2", "run", "tf2_ros", "tf2_echo", "BEARING_1", "GRIPPER_CENTER_LINK"]
@@ -2638,18 +2636,58 @@ class JETANKGripperControlGUI(Node):
         self.update_status("Stopped")
         
     def objects_callback(self, msg):
-        """Callback for objects_poses topic"""
+        """Callback for objects_poses topic (TFMessage format)"""
+        import math
         with self.objects_lock:
             # Store the latest objects data
             self.objects_data = {}
-            for obj in msg.objects:
-                self.objects_data[obj.object_name] = {
-                    'position': [obj.pose.position.x, obj.pose.position.y, obj.pose.position.z],
-                    'orientation': [obj.pose.orientation.x, obj.pose.orientation.y, obj.pose.orientation.z, obj.pose.orientation.w],
-                    'roll': obj.roll,
-                    'pitch': obj.pitch,
-                    'yaw': obj.yaw,
-                    'header': obj.header
+            for transform in msg.transforms:
+                # Use child_frame_id as object name
+                object_name = transform.child_frame_id
+                
+                # Extract position from transform
+                pos = [
+                    transform.transform.translation.x,
+                    transform.transform.translation.y,
+                    transform.transform.translation.z
+                ]
+                
+                # Extract orientation quaternion
+                quat = [
+                    transform.transform.rotation.x,
+                    transform.transform.rotation.y,
+                    transform.transform.rotation.z,
+                    transform.transform.rotation.w
+                ]
+                
+                # Convert quaternion to roll, pitch, yaw (Euler angles)
+                # Using standard conversion formula
+                w, x, y, z = quat[3], quat[0], quat[1], quat[2]
+                
+                # Roll (x-axis rotation)
+                sinr_cosp = 2 * (w * x + y * z)
+                cosr_cosp = 1 - 2 * (x * x + y * y)
+                roll = math.atan2(sinr_cosp, cosr_cosp)
+                
+                # Pitch (y-axis rotation)
+                sinp = 2 * (w * y - z * x)
+                if abs(sinp) >= 1:
+                    pitch = math.copysign(math.pi / 2, sinp)  # Use 90 degrees if out of range
+                else:
+                    pitch = math.asin(sinp)
+                
+                # Yaw (z-axis rotation)
+                siny_cosp = 2 * (w * z + x * y)
+                cosy_cosp = 1 - 2 * (y * y + z * z)
+                yaw = math.atan2(siny_cosp, cosy_cosp)
+                
+                self.objects_data[object_name] = {
+                    'position': pos,
+                    'orientation': quat,
+                    'roll': roll,
+                    'pitch': pitch,
+                    'yaw': yaw,
+                    'header': transform.header
                 }
     
     def force_r2_callback(self, msg):
@@ -2848,6 +2886,7 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
 
 
 
