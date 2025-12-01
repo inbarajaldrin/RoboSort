@@ -6,6 +6,7 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 from std_msgs.msg import Float64MultiArray, Float32
+from geometry_msgs.msg import Twist
 from rosgraph_msgs.msg import Clock
 from tf2_msgs.msg import TFMessage
 import tkinter as tk
@@ -243,6 +244,10 @@ class JETANKGripperControlGUI(Node):
         self.use_real_hardware = False
         self.hardware_mode_lock = threading.Lock()
         
+        # Wheel inversion compensation: True = wheels are inverted (need to negate commands)
+        # Set to False if wheels are correctly wired
+        self.wheels_inverted = True
+        
         # Real hardware joint mapping (5 real joints -> 12 simulated joints)
         # Real robot joints: base_joint, shoulder_joint, elbow_joint, wrist_joint, camera_joint
         self.real_joint_names = ['base_joint', 'shoulder_joint', 'elbow_joint', 'wrist_joint', 'camera_joint']
@@ -275,8 +280,11 @@ class JETANKGripperControlGUI(Node):
         # Create trajectory publisher
         self.trajectory_pub = self.create_publisher(JointTrajectory, 'arm_trajectory', 10)
         
-        # Create velocity controller publisher
+        # Create velocity controller publisher (for fake hardware/simulation)
         self.velocity_pub = self.create_publisher(Float64MultiArray, '/forward_velocity_controller/commands', 10)
+        
+        # Create cmd_vel publisher (for real hardware motor driver)
+        self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         
         # Subscriber for real hardware joint states (from servo driver)
         # Will be created/destroyed when switching modes
@@ -1445,9 +1453,9 @@ class JETANKGripperControlGUI(Node):
             self.update_status("Arm reset to home position")
     
     def camera_down(self):
-        """Move camera down to -30 degrees"""
-        # Convert -30 degrees to radians
-        target_angle = math.radians(-30.0)
+        """Move camera down to -45 degrees"""
+        # Convert -45 degrees to radians
+        target_angle = math.radians(-45.0)
         
         # Check if trajectory is enabled
         if self.use_trajectory_var.get():
@@ -1476,7 +1484,7 @@ class JETANKGripperControlGUI(Node):
                 
                 self.error_text.insert(tk.END, f"Camera down trajectory started:\n")
                 self.error_text.insert(tk.END, f"  From: {math.degrees(current_angle):.1f}°\n")
-                self.error_text.insert(tk.END, f"  To: -30.0°\n")
+                self.error_text.insert(tk.END, f"  To: -45.0°\n")
                 self.error_text.insert(tk.END, f"  Duration: {duration}s\n\n")
                 self.error_text.see(tk.END)
                 self.update_status(f"Executing camera down trajectory")
@@ -1488,7 +1496,7 @@ class JETANKGripperControlGUI(Node):
         else:
             # Use instant movement
             self.camera_tilt_var.set(target_angle)
-            self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (-30.0°)")
+            self.camera_tilt_label.config(text=f"{target_angle:.3f} rad (-45.0°)")
             
             # Only update internal state in fake hardware mode
             if not self.use_real_hardware:
@@ -2592,46 +2600,137 @@ class JETANKGripperControlGUI(Node):
         
     def move_forward(self):
         """Send forward motion command"""
-        msg = Float64MultiArray()
-        msg.data = [-5.0, 5.0, -5.0, 5.0]
-        self.velocity_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, "Forward command sent: [-5.0, 5.0, -5.0, 5.0]\n")
+        # Use positive value for forward (intuitive: +5 for forward)
+        forward_speed = 5.0
+        forward_linear = 0.5
+        
+        # Apply wheel inversion compensation if needed
+        if self.wheels_inverted:
+            forward_speed = -forward_speed
+            forward_linear = -forward_linear
+        
+        if self.use_real_hardware:
+            # Hardware mode: use cmd_vel (Twist) for motor driver
+            msg = Twist()
+            msg.linear.x = forward_linear
+            msg.angular.z = 0.0
+            self.cmd_vel_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Forward command sent (hardware): linear.x={forward_linear} (wheels: {wheel_status})\n")
+        else:
+            # Fake hardware mode: use Float64MultiArray for simulation
+            # Pattern: [left_front, right_front, left_back, right_back]
+            msg = Float64MultiArray()
+            msg.data = [forward_speed, -forward_speed, forward_speed, -forward_speed]
+            self.velocity_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Forward command sent (simulation): {msg.data} (wheels: {wheel_status})\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Moving forward")
         
     def move_backward(self):
         """Send backward motion command"""
-        msg = Float64MultiArray()
-        msg.data = [5.0, -5.0, 5.0, -5.0]
-        self.velocity_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, "Backward command sent: [5.0, -5.0, 5.0, -5.0]\n")
+        # Use negative value for backward (intuitive: -5 for backward)
+        backward_speed = -5.0
+        backward_linear = -0.5
+        
+        # Apply wheel inversion compensation if needed
+        if self.wheels_inverted:
+            backward_speed = -backward_speed
+            backward_linear = -backward_linear
+        
+        if self.use_real_hardware:
+            # Hardware mode: use cmd_vel (Twist) for motor driver
+            msg = Twist()
+            msg.linear.x = backward_linear
+            msg.angular.z = 0.0
+            self.cmd_vel_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Backward command sent (hardware): linear.x={backward_linear} (wheels: {wheel_status})\n")
+        else:
+            # Fake hardware mode: use Float64MultiArray for simulation
+            # Pattern: [left_front, right_front, left_back, right_back]
+            msg = Float64MultiArray()
+            msg.data = [backward_speed, -backward_speed, backward_speed, -backward_speed]
+            self.velocity_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Backward command sent (simulation): {msg.data} (wheels: {wheel_status})\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Moving backward")
         
     def move_left(self):
         """Send left turn command"""
-        msg = Float64MultiArray()
-        msg.data = [5.0, 5.0, 5.0, 5.0]
-        self.velocity_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, "Left turn command sent: [5.0, 5.0, 5.0, 5.0]\n")
+        # Use positive angular velocity for left turn (intuitive)
+        angular_speed = 0.5
+        turn_speed = 5.0
+        
+        # Apply wheel inversion compensation if needed
+        if self.wheels_inverted:
+            angular_speed = -angular_speed
+            turn_speed = -turn_speed
+        
+        if self.use_real_hardware:
+            # Hardware mode: use cmd_vel (Twist) for motor driver
+            msg = Twist()
+            msg.linear.x = 0.0
+            msg.angular.z = angular_speed
+            self.cmd_vel_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Left turn command sent (hardware): angular.z={angular_speed} (wheels: {wheel_status})\n")
+        else:
+            # Fake hardware mode: use Float64MultiArray for simulation
+            msg = Float64MultiArray()
+            msg.data = [turn_speed, turn_speed, turn_speed, turn_speed]
+            self.velocity_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Left turn command sent (simulation): {msg.data} (wheels: {wheel_status})\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Turning left")
         
     def move_right(self):
         """Send right turn command"""
-        msg = Float64MultiArray()
-        msg.data = [-5.0, -5.0, -5.0, -5.0]
-        self.velocity_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, "Right turn command sent: [-5.0, -5.0, -5.0, -5.0]\n")
+        # Use negative angular velocity for right turn (intuitive)
+        angular_speed = -0.5
+        turn_speed = -5.0
+        
+        # Apply wheel inversion compensation if needed
+        if self.wheels_inverted:
+            angular_speed = -angular_speed
+            turn_speed = -turn_speed
+        
+        if self.use_real_hardware:
+            # Hardware mode: use cmd_vel (Twist) for motor driver
+            msg = Twist()
+            msg.linear.x = 0.0
+            msg.angular.z = angular_speed
+            self.cmd_vel_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Right turn command sent (hardware): angular.z={angular_speed} (wheels: {wheel_status})\n")
+        else:
+            # Fake hardware mode: use Float64MultiArray for simulation
+            msg = Float64MultiArray()
+            msg.data = [turn_speed, turn_speed, turn_speed, turn_speed]
+            self.velocity_pub.publish(msg)
+            wheel_status = "inverted" if self.wheels_inverted else "normal"
+            self.motion_status_text.insert(tk.END, f"Right turn command sent (simulation): {msg.data} (wheels: {wheel_status})\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Turning right")
         
     def stop_motion(self):
         """Send stop motion command"""
-        msg = Float64MultiArray()
-        msg.data = [0.0, 0.0, 0.0, 0.0]
-        self.velocity_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, "Stop command sent: [0.0, 0.0, 0.0, 0.0]\n")
+        if self.use_real_hardware:
+            # Hardware mode: use cmd_vel (Twist) for motor driver
+            msg = Twist()
+            msg.linear.x = 0.0
+            msg.angular.z = 0.0
+            self.cmd_vel_pub.publish(msg)
+            self.motion_status_text.insert(tk.END, "Stop command sent (hardware): linear.x=0.0, angular.z=0.0\n")
+        else:
+            # Fake hardware mode: use Float64MultiArray for simulation
+            msg = Float64MultiArray()
+            msg.data = [0.0, 0.0, 0.0, 0.0]
+            self.velocity_pub.publish(msg)
+            self.motion_status_text.insert(tk.END, "Stop command sent (simulation): [0.0, 0.0, 0.0, 0.0]\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Stopped")
         
@@ -2886,6 +2985,7 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
 
 
 

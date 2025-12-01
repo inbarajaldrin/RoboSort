@@ -54,6 +54,14 @@ def generate_launch_description():
         ]
     )
 
+    # Motor Driver - controls the drive motors in hardware mode
+    motor_driver_node = Node(
+        package='jetank_control',
+        executable='motor',
+        name='motor_driver',
+        output='screen'
+    )
+
     # JETANK Control GUI
     jetank_control_gui_node = Node(
         package='JETANK_description',
@@ -116,10 +124,12 @@ def generate_launch_description():
     return LaunchDescription([
         robot_state_publisher_node,
         servo_driver_node,
+        motor_driver_node,
         jetank_control_gui_node,
         ee_pose_publisher_node,
         camera_pose_publisher_node,
         camera_to_ee_pose_publisher_node,
         rviz_node
     ])
+
 
