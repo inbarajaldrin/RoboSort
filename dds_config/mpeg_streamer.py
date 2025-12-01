@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 MJPEG streamer that subscribes to ROS2 camera topic
-Uses the same QoS that worked with ros2 topic echo
 """
 
 import rclpy
@@ -27,12 +26,12 @@ class MJPEGStreamerNode(Node):
         self.frame_lock = threading.Lock()
         self.frame_count = 0
         
-        # QoS that worked: best_effort + volatile
+        # QoS matching the camera publisher (RELIABLE)
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=10
         )
         
         self.sub = self.create_subscription(
@@ -41,14 +40,7 @@ class MJPEGStreamerNode(Node):
             self.image_callback,
             qos
         )
-        self.get_logger().info('Subscribed to /camera/image_raw (BEST_EFFORT/VOLATILE)')
-        
-        # Status timer
-        self.timer = self.create_timer(2.0, self.status_callback)
-        
-    def status_callback(self):
-        # self.get_logger().info(f'Frames received: {self.frame_count}')
-        pass
+        self.get_logger().info('Subscribed to /camera/image_raw (RELIABLE/VOLATILE)')
         
     def image_callback(self, msg):
         try:
@@ -68,7 +60,6 @@ class MJPEGStreamerNode(Node):
         return None
 
 
-# Global node reference
 ros_node = None
 
 
@@ -109,7 +100,6 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     frame = ros_node.get_frame() if ros_node else None
                     
                     if frame is None:
-                        # Show waiting message
                         frame = np.zeros((480, 640, 3), dtype='uint8')
                         cv2.putText(frame, "Waiting for camera...", (50, 240),
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
@@ -151,11 +141,9 @@ def main():
     rclpy.init()
     ros_node = MJPEGStreamerNode()
     
-    # ROS2 spin in background
     ros_thread = threading.Thread(target=lambda: rclpy.spin(ros_node), daemon=True)
     ros_thread.start()
     
-    # HTTP server
     port = 8081
     server = ThreadedHTTPServer(('0.0.0.0', port), MJPEGHandler)
     print(f"\n{'='*50}")
