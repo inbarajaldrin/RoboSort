@@ -551,18 +551,20 @@ class JETANKGripperControlGUI(Node):
         """Convert wrist servo angle to gripper finger angles"""
         # The wrist servo controls the gripper opening/closing
         # Map wrist angle range to gripper angle range
-        # Adjust this mapping based on your specific hardware
-        # Assuming wrist range maps to gripper range [-1.047, 0]
-        gripper_max = 1.047198
+        # Actual wrist servo max range: 0.0 (closed) to 1.22 (fully open) radians
+        gripper_max = 1.047198  # URDF gripper joint limit
+        wrist_max = 1.22  # Actual maximum wrist servo angle (fully open)
         # Normalize wrist angle and scale to gripper range
-        gripper_angle = wrist_angle * gripper_max / (math.pi / 2)
+        gripper_angle = wrist_angle * gripper_max / wrist_max
         return max(-gripper_max, min(gripper_max, gripper_angle))
     
     def gripper_to_wrist_angle(self, gripper_angle):
         """Convert gripper finger angle to wrist servo angle"""
         # Reverse of wrist_to_gripper_angle
-        gripper_max = 1.047198
-        wrist_angle = gripper_angle * (math.pi / 2) / gripper_max
+        # Actual wrist servo max range: 0.0 (closed) to 1.22 (fully open) radians
+        gripper_max = 1.047198  # URDF gripper joint limit
+        wrist_max = 1.22  # Actual maximum wrist servo angle (fully open)
+        wrist_angle = gripper_angle * wrist_max / gripper_max
         return wrist_angle
     
     def send_real_hardware_command(self, joint_name, position, velocity=None):
@@ -2985,6 +2987,7 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
 
 
 
