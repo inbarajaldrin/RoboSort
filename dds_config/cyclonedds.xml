@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config">
+    <Domain id="45">
+        <General>
+            <NetworkInterfaceAddress>tailscale0</NetworkInterfaceAddress>
+            <AllowMulticast>false</AllowMulticast>
+            <EnableMulticastLoopback>false</EnableMulticastLoopback>
+        </General>
+        <Discovery>
+            <Peers>
+                <Peer address="100.88.193.82"/>
+                <Peer address="100.97.45.92"/>
+            </Peers>
+            <ParticipantIndex>auto</ParticipantIndex>
+        </Discovery>
+    </Domain>
+</CycloneDDS>
