@@ -290,6 +290,15 @@ class JETANKGripperControlGUI(Node):
         # Will be created/destroyed when switching modes
         self.real_joint_state_sub = None
         
+        # Subscriber for joint commands (works in both simulation and real mode)
+        # Allows external nodes to control the robot by publishing to joint_commands
+        self.joint_command_sub = self.create_subscription(
+            JointState,
+            'joint_commands',
+            self.joint_command_callback,
+            10
+        )
+        
         # Object detection data
         self.objects_data = {}  # Store latest objects data
         self.objects_lock = threading.Lock()  # Thread safety for objects data
@@ -426,6 +435,43 @@ class JETANKGripperControlGUI(Node):
                     self.destroy_subscription(self.real_joint_state_sub)
                     self.real_joint_state_sub = None
                 self.update_status("Mode: Fake Hardware")
+    
+    def joint_command_callback(self, msg):
+        """Callback for receiving joint commands (works in simulation mode only)
+        
+        Only supports 12 simulated joints format (URDF joint names).
+        In real hardware mode, commands are handled by hardware, not simulation.
+        """
+        # In real hardware mode, commands go to hardware, not simulation
+        if self.use_real_hardware:
+            return  # Commands are handled by hardware, not simulation
+        
+        if not msg.name or not msg.position:
+            return
+        
+        # Create mapping from joint name to position
+        command_positions = {}
+        for i, name in enumerate(msg.name):
+            if i < len(msg.position):
+                command_positions[name] = msg.position[i]
+        
+        # Update joint state positions - only support 12 simulated joints format
+        positions = list(self.joint_state.position)
+        
+        # Map commands to simulated joints (must match URDF joint names)
+        for i, name in enumerate(self.joint_state.name):
+            if name in command_positions:
+                positions[i] = command_positions[name]
+                # Apply joint limits if available
+                if name in self.joint_limits:
+                    lower = self.joint_limits[name].get('lower', -float('inf'))
+                    upper = self.joint_limits[name].get('upper', float('inf'))
+                    positions[i] = max(lower, min(upper, positions[i]))
+        
+        # Update joint state
+        self.joint_state.position = positions
+        
+        self.get_logger().debug(f'Updated joint states from external command: {len(msg.name)} simulated joints')
     
     def real_joint_state_callback(self, msg):
         """Callback for receiving joint states from real hardware (servo driver)"""
@@ -598,6 +644,11 @@ class JETANKGripperControlGUI(Node):
         """Send gripper (wrist) command to real hardware"""
         if not self.use_real_hardware:
             return
+        
+        # Clamp wrist angle to hardware limits: [0.0 (closed) to 1.22 (fully open)]
+        wrist_max = 1.22  # Maximum wrist servo angle (fully open)
+        wrist_min = 0.014   # Minimum wrist servo angle (closed)
+        wrist_angle = max(wrist_min, min(wrist_max, wrist_angle))
         
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
