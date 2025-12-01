@@ -303,13 +303,11 @@ class JETANKGripperControlGUI(Node):
         self.objects_data = {}  # Store latest objects data
         self.objects_lock = threading.Lock()  # Thread safety for objects data
         
-        # Create subscriber for object poses
-        self.objects_sub = self.create_subscription(
-            TFMessage,
-            '/objects_poses',
-            self.objects_callback,
-            10
-        )
+        # Create subscriber for object poses (will be initialized after GUI setup)
+        # Start with default topic, can be updated via GUI
+        self.objects_sub = None
+        self.objects_topic = '/objects_poses'  # Default topic name
+        self._create_objects_subscription()
         
         # Force monitoring for gripper
         self.gripper_force_r2 = 0.0
@@ -987,7 +985,7 @@ class JETANKGripperControlGUI(Node):
         topic_frame = ttk.Frame(object_frame)
         topic_frame.pack(fill=tk.X, pady=2)
         ttk.Label(topic_frame, text="Topic:", width=8).pack(side=tk.LEFT)
-        self.topic_var = tk.StringVar(value="/objects_poses")
+        self.topic_var = tk.StringVar(value=self.objects_topic)
         self.topic_entry = ttk.Entry(topic_frame, textvariable=self.topic_var, width=20)
         self.topic_entry.pack(side=tk.LEFT, padx=(5, 0))
         
@@ -1002,10 +1000,17 @@ class JETANKGripperControlGUI(Node):
         # Move to object button
         object_button_frame = ttk.Frame(object_frame)
         object_button_frame.pack(fill=tk.X, pady=5)
-        ttk.Button(object_button_frame, text="Move to Grab", 
-                  command=self.move_to_object).pack(side=tk.LEFT, padx=5)
+        self.move_to_object_button = ttk.Button(object_button_frame, text="Move to Grab", 
+                  command=self.move_to_object)
+        self.move_to_object_button.pack(side=tk.LEFT, padx=5)
         ttk.Button(object_button_frame, text="Refresh Objects", 
                   command=self.refresh_objects).pack(side=tk.LEFT, padx=5)
+        ttk.Button(object_button_frame, text="Update Topic", 
+                  command=self.update_topic).pack(side=tk.LEFT, padx=5)
+        
+        # Update button text based on current topic (after button is created)
+        if hasattr(self, 'objects_topic'):
+            self._update_button_text()
         
         # Trajectory and Camera control in side-by-side layout
         trajectory_camera_frame = ttk.Frame(arm_control_frame)
@@ -1072,9 +1077,10 @@ class JETANKGripperControlGUI(Node):
         self.error_text.insert(tk.END, "Click 'Reset Position' to return to home position\n")
         self.error_text.insert(tk.END, "Inverse Kinematics will calculate the required joint angles\n\n")
         self.error_text.insert(tk.END, "Target Object:\n")
-        self.error_text.insert(tk.END, "  Enter object name and click 'Move to Grab' to move to detected object\n")
+        self.error_text.insert(tk.END, "  Enter object name and click 'Move to Grab' (or 'Move to Drop' for drop_poses) to move to detected object\n")
         self.error_text.insert(tk.END, "  Click 'Refresh Objects' to see available objects\n")
-        self.error_text.insert(tk.END, "  Object positions are automatically converted from meters to mm\n\n")
+        self.error_text.insert(tk.END, "  Object positions are automatically converted from meters to mm\n")
+        self.error_text.insert(tk.END, "  For drop_poses topic, a +0.05m (+50mm) z-offset is automatically applied\n\n")
         self.error_text.insert(tk.END, "Workspace limits (approximate):\n")
         self.error_text.insert(tk.END, "  X: -200 to 200 mm\n")
         self.error_text.insert(tk.END, "  Y: -200 to 200 mm\n")
@@ -2787,6 +2793,46 @@ class JETANKGripperControlGUI(Node):
         self.motion_status_text.see(tk.END)
         self.update_status("Stopped")
         
+    def _create_objects_subscription(self):
+        """Create or recreate the objects subscription with current topic name"""
+        # Destroy existing subscription if it exists
+        if self.objects_sub is not None:
+            self.destroy_subscription(self.objects_sub)
+            self.objects_sub = None
+        
+        # Create new subscription with current topic
+        self.objects_sub = self.create_subscription(
+            TFMessage,
+            self.objects_topic,
+            self.objects_callback,
+            10
+        )
+        self.get_logger().info(f'Subscribed to objects topic: {self.objects_topic}')
+    
+    def _update_objects_subscription(self):
+        """Update the subscription to use the topic from GUI"""
+        if hasattr(self, 'topic_var'):
+            new_topic = self.topic_var.get().strip()
+            if new_topic and new_topic != self.objects_topic:
+                self.objects_topic = new_topic
+                self._create_objects_subscription()
+                self._update_button_text()
+                # Log offset information for drop_poses topic
+                if self.objects_topic == '/drop_poses':
+                    if hasattr(self, 'error_text'):
+                        self.error_text.insert(tk.END, f"Note: Z-offset of +0.05m (+50mm) will be applied for drop_poses topic\n")
+                        self.error_text.see(tk.END)
+                return True
+        return False
+    
+    def _update_button_text(self):
+        """Update the button text based on the current topic"""
+        if hasattr(self, 'move_to_object_button'):
+            if self.objects_topic == '/drop_poses':
+                self.move_to_object_button.config(text="Move to Drop")
+            else:
+                self.move_to_object_button.config(text="Move to Grab")
+    
     def objects_callback(self, msg):
         """Callback for objects_poses topic (TFMessage format)"""
         import math
@@ -2931,10 +2977,15 @@ class JETANKGripperControlGUI(Node):
                 self.update_status(f"Object '{object_name}' not found")
                 return
             
+            # Apply z-offset for drop_poses topic
+            z_position = position[2]
+            if self.objects_topic == '/drop_poses':
+                z_position = position[2] + 0.05  # Add 0.05m for drop poses
+            
             # Convert from meters to millimeters
             x_mm = position[0] * 1000
             y_mm = position[1] * 1000
-            z_mm = position[2] * 1000
+            z_mm = z_position * 1000
             
             # Update coordinate fields
             self.x_var.set(f"{x_mm:.1f}")
@@ -2942,9 +2993,14 @@ class JETANKGripperControlGUI(Node):
             self.z_var.set(f"{z_mm:.1f}")
             
             # Use existing move_to_position function
-            self.error_text.insert(tk.END, f"Moving to object '{object_name}' at position: X={x_mm:.1f}mm, Y={y_mm:.1f}mm, Z={z_mm:.1f}mm\n")
+            action_text = "dropping" if self.objects_topic == '/drop_poses' else "grabbing"
+            self.error_text.insert(tk.END, f"Moving to {action_text} object '{object_name}' at position: X={x_mm:.1f}mm, Y={y_mm:.1f}mm, Z={z_mm:.1f}mm")
+            if self.objects_topic == '/drop_poses':
+                self.error_text.insert(tk.END, f" (original Z={position[2]*1000:.1f}mm, offset +50mm)\n")
+            else:
+                self.error_text.insert(tk.END, "\n")
             self.error_text.see(tk.END)
-            self.update_status(f"Moving to object '{object_name}'")
+            self.update_status(f"Moving to {action_text} object '{object_name}'")
             
             # Call the existing move_to_position function
             self.move_to_position()
@@ -2954,17 +3010,44 @@ class JETANKGripperControlGUI(Node):
             self.error_text.see(tk.END)
             self.update_status(f"Error: {str(e)}")
     
+    def update_topic(self):
+        """Update the subscription to use the topic from the GUI"""
+        try:
+            if self._update_objects_subscription():
+                self.error_text.insert(tk.END, f"Updated subscription to topic: {self.objects_topic}\n")
+                self.error_text.see(tk.END)
+                self.update_status(f"Subscribed to: {self.objects_topic}")
+            else:
+                # Still update button text even if topic didn't change (in case it was set before GUI)
+                self._update_button_text()
+                # Log offset information if switching to drop_poses
+                if self.objects_topic == '/drop_poses':
+                    self.error_text.insert(tk.END, f"Already subscribed to: {self.objects_topic}\n")
+                    self.error_text.insert(tk.END, f"Note: Z-offset of +0.05m (+50mm) will be applied for drop_poses topic\n")
+                else:
+                    self.error_text.insert(tk.END, f"Already subscribed to: {self.objects_topic}\n")
+                self.error_text.see(tk.END)
+        except Exception as e:
+            self.error_text.insert(tk.END, f"Error updating topic: {str(e)}\n")
+            self.error_text.see(tk.END)
+            self.update_status(f"Error: {str(e)}")
+    
     def refresh_objects(self):
         """Refresh and display available objects"""
         try:
+            # Update subscription if topic changed
+            self._update_objects_subscription()
+            
             available_objects = self.list_available_objects()
             
             if available_objects:
                 self.error_text.insert(tk.END, f"Available objects: {', '.join(available_objects)}\n")
+                self.error_text.insert(tk.END, f"Topic: {self.objects_topic}\n")
                 self.error_text.see(tk.END)
                 self.update_status(f"Found {len(available_objects)} objects")
             else:
-                self.error_text.insert(tk.END, "No objects detected. Make sure the object detection system is running.\n")
+                self.error_text.insert(tk.END, f"No objects detected on topic: {self.objects_topic}\n")
+                self.error_text.insert(tk.END, "Make sure the object detection system is running and topic is correct.\n")
                 self.error_text.see(tk.END)
                 self.update_status("No objects detected")
                 
