@@ -62,6 +62,14 @@ def generate_launch_description():
         output='screen'
     )
 
+    # IMU Driver - BNO055 IMU sensor
+    imu_driver_node = Node(
+        package='jetank_control',
+        executable='imu',
+        name='imu_driver',
+        output='screen'
+    )
+
     # JETANK Control GUI
     jetank_control_gui_node = Node(
         package='JETANK_description',
@@ -125,11 +133,13 @@ def generate_launch_description():
         robot_state_publisher_node,
         servo_driver_node,
         motor_driver_node,
+        imu_driver_node,
         jetank_control_gui_node,
         ee_pose_publisher_node,
         camera_pose_publisher_node,
         camera_to_ee_pose_publisher_node,
         rviz_node
     ])
+
 
 
