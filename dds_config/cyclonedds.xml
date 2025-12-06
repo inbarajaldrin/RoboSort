@@ -8,10 +8,13 @@
         </General>
         <Discovery>
             <Peers>
+                <Peer address="100.71.115.30"/>
                 <Peer address="100.88.193.82"/>
                 <Peer address="100.97.45.92"/>
             </Peers>
             <ParticipantIndex>auto</ParticipantIndex>
+            <MaxAutoParticipantIndex>250</MaxAutoParticipantIndex>
         </Discovery>
     </Domain>
 </CycloneDDS>
+
