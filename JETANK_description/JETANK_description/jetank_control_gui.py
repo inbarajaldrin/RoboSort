@@ -401,7 +401,7 @@ class JETANKGripperControlGUI(Node):
         # Start with 0.1s (10Hz), will adjust dynamically
         self.timer = self.create_timer(0.1, self.publish_joint_states)
         
-        self.get_logger().info('JETANK Gripper Control GUI initialized')
+        self.get_logger().info('JETANK Control GUI initialized')
     
     # ==================== Real Hardware Methods ====================
     
@@ -752,7 +752,7 @@ class JETANKGripperControlGUI(Node):
     def create_gui(self):
         """Create the Tkinter GUI in the GUI thread"""
         self.root = tk.Tk()
-        self.root.title("JETANK Gripper Controller")
+        self.root.title("JETANK Control")
         self.root.geometry("450x580")
         
         # Handle window close
@@ -763,7 +763,7 @@ class JETANKGripperControlGUI(Node):
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title
-        title_label = ttk.Label(main_frame, text="JETANK Gripper Control", 
+        title_label = ttk.Label(main_frame, text="JETANK Control", 
                                font=('Arial', 16, 'bold'))
         title_label.pack(pady=(0, 10))
         
@@ -3121,6 +3121,7 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
 
 
 
