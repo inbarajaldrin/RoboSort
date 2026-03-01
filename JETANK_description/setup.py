@@ -16,6 +16,7 @@ setup(
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*')),
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*')),
         (os.path.join('share', package_name, 'config'), glob('config/*')),
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*')),
         (os.path.join('share', package_name, 'scripts'), glob('scripts/*.py'))
     ],
     install_requires=['setuptools'],
@@ -31,6 +32,7 @@ setup(
             'ee_pose_publisher = JETANK_description.ee_pose_publisher:main',
             'camera_pose_publisher = JETANK_description.camera_pose_publisher:main',
             'camera_to_ee_pose_publisher = JETANK_description.camera_to_ee_pose_publisher:main',
+            'verify_detections = JETANK_description.verify_detections:main',
         ],
     },
 )

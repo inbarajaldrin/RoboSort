@@ -176,7 +176,7 @@
   <inertial>
     <origin xyz="-0.01499953892313019 4.862891752669459e-05 0.0029999309597343315" rpy="0 0 0"/>
     <mass value="0.0062442558314246485"/>
-    <inertia ixx="0.0" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
     <origin xyz="0.174488 0.004873 -0.179831" rpy="0 0 0"/>
@@ -197,7 +197,7 @@
   <inertial>
     <origin xyz="-0.0024363716844204852 0.003974526639710773 0.003008312151974085" rpy="0 0 0"/>
     <mass value="0.02146027585992414"/>
-    <inertia ixx="0.0" iyy="6e-06" izz="6e-06" ixy="-1e-06" iyz="-0.0" ixz="-0.0"/>
+    <inertia ixx="1e-06" iyy="6e-06" izz="6e-06" ixy="-1e-06" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="0.204487 0.004763 -0.179731" rpy="0 0 0"/>
@@ -344,7 +344,7 @@
   <inertial>
     <origin xyz="-0.014999865534495699 4.7716893300363966e-05 0.002999957523558139" rpy="0 0 0"/>
     <mass value="0.006244255831424672"/>
-    <inertia ixx="0.0" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
     <origin xyz="0.174524 0.014872 -0.17981" rpy="0 0 0"/>
@@ -587,6 +587,21 @@
   <origin xyz="0.070406 0.033281 -0.007749" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="ANTENNA_R_2"/>
+</joint>
+
+<!-- Camera optical frame (OpenCV convention: X-right, Y-down, Z-forward) -->
+<link name="camera_optical_frame">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.001"/>
+    <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" iyz="0" ixz="0"/>
+  </inertial>
+</link>
+
+<joint name="camera_optical_joint" type="fixed">
+  <origin xyz="0 0 0" rpy="-1.5707963 0 -1.5707963"/>
+  <parent link="CAMERA_1"/>
+  <child link="camera_optical_frame"/>
 </joint>
 
 </robot>
