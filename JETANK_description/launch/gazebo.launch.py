@@ -50,14 +50,14 @@ def generate_launch_description():
     )
 
     # Set DISPLAY for Ignition Gazebo GUI
-    set_display = SetEnvironmentVariable('DISPLAY', ':1')
+    set_display = SetEnvironmentVariable('DISPLAY', ':0')
 
     # Launch Ignition Gazebo server-only (headless) for faster performance
     # Use 'ign gazebo -r' (without -s) if you need the GUI
     ign_gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo', '-r', '-s', world_file],
         output='screen',
-        additional_env={'DISPLAY': ':1'},
+        additional_env={'DISPLAY': ':0'},
     )
 
     # Robot is embedded directly in the world SDF (no dynamic spawning needed)

@@ -97,27 +97,66 @@
 
     <!--
       ============================================================
-      PHASE A: Large colored blocks (~5cm cubes)
+      PHASE A: Large colored blocks (~5cm cubes) — DISABLED
       Ground truth positions (world frame):
         red_block:   (0.20, -0.10, 0.025) yaw=0.3
         green_block: (0.15,  0.08, 0.025) yaw=-0.5
         blue_block:  (0.25,  0.05, 0.025) yaw=0.8
       ============================================================
     -->
-
-    <!-- Red block: 5cm cube -->
+    <!-- Phase A blocks commented out
     <model name="red_block">
       <static>true</static>
       <pose>0.20 -0.10 0.025 0 0 0.3</pose>
       <link name="link">
+        <collision name="collision"><geometry><box><size>0.05 0.05 0.05</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material><ambient>0.9 0.1 0.1 1</ambient><diffuse>0.9 0.1 0.1 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="green_block">
+      <static>true</static>
+      <pose>0.15 0.08 0.025 0 0 -0.5</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.05 0.05 0.05</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material><ambient>0.1 0.8 0.1 1</ambient><diffuse>0.1 0.8 0.1 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="blue_block">
+      <static>true</static>
+      <pose>0.25 0.05 0.025 0 0 0.8</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.05 0.05 0.05</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+          <material><ambient>0.1 0.1 0.9 1</ambient><diffuse>0.1 0.1 0.9 1</diffuse></material></visual>
+      </link>
+    </model>
+    -->
+
+    <!--
+      ============================================================
+      PHASE B: Real lego-sized bricks
+      Ground truth positions (world frame, z = half height = 0.0055):
+        red_lego_2x4:   (0.18, -0.08, 0.0055) yaw=0.3   size=32x16x11mm
+        green_lego_2x3: (0.14,  0.06, 0.0055) yaw=-0.5  size=24x16x11mm
+        blue_lego_2x2:  (0.22,  0.04, 0.0055) yaw=0.8   size=16x16x11mm
+      ============================================================
+    -->
+
+    <!-- Red lego 2x4: 32x16x11mm -->
+    <model name="red_lego_2x4">
+      <static>true</static>
+      <pose>0.18 -0.08 0.0055 0 0 0.3</pose>
+      <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.032 0.016 0.011</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.032 0.016 0.011</size></box>
           </geometry>
           <material>
             <ambient>0.9 0.1 0.1 1</ambient>
@@ -128,19 +167,19 @@
       </link>
     </model>
 
-    <!-- Green block: 5cm cube -->
-    <model name="green_block">
+    <!-- Green lego 2x3: 24x16x11mm -->
+    <model name="green_lego_2x3">
       <static>true</static>
-      <pose>0.15 0.08 0.025 0 0 -0.5</pose>
+      <pose>0.14 0.06 0.0055 0 0 -0.5</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.024 0.016 0.011</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.024 0.016 0.011</size></box>
           </geometry>
           <material>
             <ambient>0.1 0.8 0.1 1</ambient>
@@ -151,19 +190,19 @@
       </link>
     </model>
 
-    <!-- Blue block: 5cm cube -->
-    <model name="blue_block">
+    <!-- Blue lego 2x2: 16x16x11mm -->
+    <model name="blue_lego_2x2">
       <static>true</static>
-      <pose>0.25 0.05 0.025 0 0 0.8</pose>
+      <pose>0.22 0.04 0.0055 0 0 0.8</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.016 0.016 0.011</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.05 0.05 0.05</size></box>
+            <box><size>0.016 0.016 0.011</size></box>
           </geometry>
           <material>
             <ambient>0.1 0.1 0.9 1</ambient>
@@ -176,12 +215,13 @@
 
     <!--
       Camera model: lightweight stand-in for JETANK camera.
-      Positioned at approximate JETANK camera pose looking down at table.
-      Camera is at ~20cm height, tilted ~45° down toward the blocks.
+      Phase B: closer and steeper for small lego bricks.
+      Camera at ~15cm height, tilted ~70° down, centered over lego cluster.
+      Phase A pose was: 0.0 0.0 0.25 0 0.7854 0  (25cm high, 45° down)
     -->
     <model name="camera_stand">
       <static>true</static>
-      <pose>0.0 0.0 0.25 0 0.7854 0</pose>
+      <pose>0.15 0.0 0.15 0 1.2 0</pose>
       <link name="camera_link">
         <inertial>
           <mass>0.1</mass>

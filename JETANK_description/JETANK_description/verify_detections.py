@@ -24,14 +24,14 @@ GROUND_TRUTH_PHASE_A = {
     'blue': {'x': 0.25, 'y': 0.05, 'z': 0.025, 'yaw': 0.8},
 }
 
-# Phase B: Real lego bricks (uncomment when switching)
-# GROUND_TRUTH_PHASE_B = {
-#     'red': {'x': 0.18, 'y': -0.08, 'z': 0.0055, 'yaw': 0.3},
-#     'green': {'x': 0.14, 'y': 0.06, 'z': 0.0055, 'yaw': -0.5},
-#     'blue': {'x': 0.22, 'y': 0.04, 'z': 0.0055, 'yaw': 0.8},
-# }
+# Phase B: Real lego bricks
+GROUND_TRUTH_PHASE_B = {
+    'red': {'x': 0.18, 'y': -0.08, 'z': 0.0055, 'yaw': 0.3},
+    'green': {'x': 0.14, 'y': 0.06, 'z': 0.0055, 'yaw': -0.5},
+    'blue': {'x': 0.22, 'y': 0.04, 'z': 0.0055, 'yaw': 0.8},
+}
 
-GROUND_TRUTH = GROUND_TRUTH_PHASE_A
+GROUND_TRUTH = GROUND_TRUTH_PHASE_B
 
 
 class DetectionVerifier(Node):
