@@ -33,6 +33,7 @@ setup(
             'camera_pose_publisher = JETANK_description.camera_pose_publisher:main',
             'camera_to_ee_pose_publisher = JETANK_description.camera_to_ee_pose_publisher:main',
             'verify_detections = JETANK_description.verify_detections:main',
+            'joint_command_bridge = JETANK_description.joint_command_bridge:main',
         ],
     },
 )

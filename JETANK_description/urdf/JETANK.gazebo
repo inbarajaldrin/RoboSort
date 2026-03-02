@@ -7,6 +7,63 @@
   <!-- Ignition Gazebo: publish joint states -->
   <plugin filename="ignition-gazebo-joint-state-publisher-system"
           name="ignition::gazebo::systems::JointStatePublisher"/>
+
+  <!-- Joint position controllers: Gazebo defaults (no custom PID/cmd limits) -->
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>revolute_BEARING</joint_name>
+    <topic>/cmd/revolute_BEARING</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>Revolute_SERVO_LOWER</joint_name>
+    <topic>/cmd/Revolute_SERVO_LOWER</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>Revolute_SERVO_UPPER</joint_name>
+    <topic>/cmd/Revolute_SERVO_UPPER</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>revolute_CAMERA_HOLDER_ARM_LOWER</joint_name>
+    <topic>/cmd/revolute_CAMERA_HOLDER_ARM_LOWER</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>revolute_GRIPPER_L1</joint_name>
+    <topic>/cmd/revolute_GRIPPER_L1</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>revolute_GRIPPER_L2</joint_name>
+    <topic>/cmd/revolute_GRIPPER_L2</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>Revolute_GRIPPER_R1</joint_name>
+    <topic>/cmd/Revolute_GRIPPER_R1</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-position-controller-system"
+          name="ignition::gazebo::systems::JointPositionController">
+    <joint_name>Revolute_GRIPPER_R2</joint_name>
+    <topic>/cmd/Revolute_GRIPPER_R2</topic>
+  </plugin>
+  <!-- Free wheels: no position controller — they roll freely.
+       Ground friction (mu=5.0) resists lateral sliding/yaw rotation. -->
+  <!-- Differential drive: controls drive wheels via /cmd_vel, publishes odometry -->
+  <plugin filename="ignition-gazebo-diff-drive-system"
+          name="ignition::gazebo::systems::DiffDrive">
+    <left_joint>Revolute_DRIVING_WHEEL_L</left_joint>
+    <right_joint>Revolute_DRIVING_WHEEL_R</right_joint>
+    <wheel_separation>0.1478</wheel_separation>
+    <wheel_radius>0.0273</wheel_radius>
+    <odom_publish_frequency>30</odom_publish_frequency>
+    <topic>/cmd_vel</topic>
+    <odom_topic>/odom</odom_topic>
+    <frame_id>odom</frame_id>
+    <child_frame_id>base_footprint</child_frame_id>
+  </plugin>
 </gazebo>
 <gazebo reference="base_link">
   <material>${body_color}</material>
@@ -39,15 +96,15 @@
 
 <gazebo reference="FREE_WHEEL_L_1">
   <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
+  <mu1>5.0</mu1>
+  <mu2>5.0</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 
 <gazebo reference="FREE_WHEEL_R_1">
   <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
+  <mu1>5.0</mu1>
+  <mu2>5.0</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 
@@ -62,6 +119,7 @@
     <always_on>1</always_on>
     <update_rate>30</update_rate>
     <visualize>true</visualize>
+    <ignition_frame_id>CAMERA_1</ignition_frame_id>
     <camera name="jetank_camera">
       <horizontal_fov>1.2112</horizontal_fov>
       <image>
@@ -75,12 +133,14 @@
       </clip>
     </camera>
     <topic>camera/image_raw</topic>
+    <camera_info_topic>camera/camera_info</camera_info_topic>
   </sensor>
 
   <!-- Depth Camera Sensor -->
   <sensor name="depth_sensor" type="depth_camera">
     <always_on>1</always_on>
     <update_rate>30</update_rate>
+    <ignition_frame_id>CAMERA_1</ignition_frame_id>
     <camera name="jetank_depth">
       <horizontal_fov>1.2112</horizontal_fov>
       <image>
@@ -159,15 +219,15 @@
 
 <gazebo reference="DRIVER_WHEEL_R_2">
   <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
+  <mu1>5.0</mu1>
+  <mu2>5.0</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 
 <gazebo reference="DRIVER_WHEEL_L_1">
   <material>${body_color}</material>
-  <mu1>0.2</mu1>
-  <mu2>0.2</mu2>
+  <mu1>5.0</mu1>
+  <mu2>5.0</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 
