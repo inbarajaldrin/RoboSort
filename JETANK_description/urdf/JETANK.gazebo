@@ -51,18 +51,19 @@
   </plugin>
   <!-- Free wheels: no position controller — they roll freely.
        Ground friction (mu=5.0) resists lateral sliding/yaw rotation. -->
-  <!-- Differential drive: controls drive wheels via /cmd_vel, publishes odometry -->
-  <plugin filename="ignition-gazebo-diff-drive-system"
-          name="ignition::gazebo::systems::DiffDrive">
-    <left_joint>Revolute_DRIVING_WHEEL_L</left_joint>
-    <right_joint>Revolute_DRIVING_WHEEL_R</right_joint>
-    <wheel_separation>0.1478</wheel_separation>
-    <wheel_radius>0.0273</wheel_radius>
-    <odom_publish_frequency>30</odom_publish_frequency>
-    <topic>/cmd_vel</topic>
-    <odom_topic>/odom</odom_topic>
-    <frame_id>odom</frame_id>
-    <child_frame_id>base_footprint</child_frame_id>
+  <!-- Drive wheel velocity controllers (replaces DiffDrive — URDF axes are opposite,
+       cmd_vel_to_wheels node handles the sign correction) -->
+  <plugin filename="ignition-gazebo-joint-controller-system"
+          name="ignition::gazebo::systems::JointController">
+    <joint_name>Revolute_DRIVING_WHEEL_R</joint_name>
+    <use_velocity_commands>true</use_velocity_commands>
+    <topic>/cmd/Revolute_DRIVING_WHEEL_R</topic>
+  </plugin>
+  <plugin filename="ignition-gazebo-joint-controller-system"
+          name="ignition::gazebo::systems::JointController">
+    <joint_name>Revolute_DRIVING_WHEEL_L</joint_name>
+    <use_velocity_commands>true</use_velocity_commands>
+    <topic>/cmd/Revolute_DRIVING_WHEEL_L</topic>
   </plugin>
 </gazebo>
 <gazebo reference="base_link">

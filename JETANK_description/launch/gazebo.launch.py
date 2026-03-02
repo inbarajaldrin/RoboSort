@@ -111,9 +111,9 @@ def generate_launch_description():
             '/cmd/Revolute_GRIPPER_R1@std_msgs/msg/Float64]ignition.msgs.Double',
             '/cmd/Revolute_GRIPPER_R2@std_msgs/msg/Float64]ignition.msgs.Double',
             # Free wheels: no controller — they roll freely with ground friction
-            # Diff drive: cmd_vel ROS→Gz, odometry Gz→ROS
-            '/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
-            '/odom@nav_msgs/msg/Odometry[ignition.msgs.Odometry',
+            # Drive wheels: per-wheel velocity commands ROS→Gz
+            '/cmd/Revolute_DRIVING_WHEEL_R@std_msgs/msg/Float64]ignition.msgs.Double',
+            '/cmd/Revolute_DRIVING_WHEEL_L@std_msgs/msg/Float64]ignition.msgs.Double',
         ],
         output='screen',
     )
@@ -123,6 +123,14 @@ def generate_launch_description():
         package='JETANK_description',
         executable='joint_command_bridge',
         name='joint_command_bridge',
+        output='screen',
+    )
+
+    # --- cmd_vel to wheels: converts /cmd_vel to per-wheel velocity for Gazebo ---
+    cmd_vel_to_wheels = Node(
+        package='JETANK_description',
+        executable='cmd_vel_to_wheels',
+        name='cmd_vel_to_wheels',
         output='screen',
     )
 
@@ -190,6 +198,7 @@ def generate_launch_description():
                     jetank_control_gui,
                     bridge,
                     joint_command_bridge,
+                    cmd_vel_to_wheels,
                     ee_pose_publisher,
                     camera_pose_publisher,
                     camera_to_ee_pose_publisher,

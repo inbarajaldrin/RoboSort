@@ -247,6 +247,9 @@ class JETANKGripperControlGUI(Node):
         # Wheel inversion compensation: True = wheels are inverted (need to negate commands)
         # Set to False if wheels are correctly wired
         self.wheels_inverted = True
+
+        # Motion active flag: suppresses zero cmd_vel brake while moving
+        self.motion_active = False
         
         # Real hardware joint mapping (5 real joints -> 12 simulated joints)
         # Real robot joints: base_joint, shoulder_joint, elbow_joint, wrist_joint, camera_joint
@@ -2659,6 +2662,7 @@ class JETANKGripperControlGUI(Node):
         
     def move_forward(self):
         """Send forward motion command via cmd_vel"""
+        self.motion_active = True
         linear = 0.5
         if self.wheels_inverted:
             linear = -linear
@@ -2669,9 +2673,10 @@ class JETANKGripperControlGUI(Node):
         self.motion_status_text.insert(tk.END, f"Forward: linear.x={linear}\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Moving forward")
-        
+
     def move_backward(self):
         """Send backward motion command via cmd_vel"""
+        self.motion_active = True
         linear = -0.5
         if self.wheels_inverted:
             linear = -linear
@@ -2682,9 +2687,10 @@ class JETANKGripperControlGUI(Node):
         self.motion_status_text.insert(tk.END, f"Backward: linear.x={linear}\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Moving backward")
-        
+
     def move_left(self):
         """Send left turn command via cmd_vel"""
+        self.motion_active = True
         angular = 0.5
         if self.wheels_inverted:
             angular = -angular
@@ -2695,9 +2701,10 @@ class JETANKGripperControlGUI(Node):
         self.motion_status_text.insert(tk.END, f"Left turn: angular.z={angular}\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Turning left")
-        
+
     def move_right(self):
         """Send right turn command via cmd_vel"""
+        self.motion_active = True
         angular = -0.5
         if self.wheels_inverted:
             angular = -angular
@@ -2711,6 +2718,7 @@ class JETANKGripperControlGUI(Node):
         
     def stop_motion(self):
         """Send stop motion command via cmd_vel"""
+        self.motion_active = False
         msg = Twist()
         msg.linear.x = 0.0
         msg.angular.z = 0.0
@@ -3034,7 +3042,8 @@ class JETANKGripperControlGUI(Node):
             self.joint_command_pub.publish(self.joint_state)
             # Publish zero cmd_vel so DiffDrive actively brakes wheels
             # (prevents drift from arm reaction torques in simulation)
-            self.cmd_vel_pub.publish(Twist())
+            if not self.motion_active:
+                self.cmd_vel_pub.publish(Twist())
 
 def main(args=None):
     rclpy.init(args=args)
