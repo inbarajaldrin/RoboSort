@@ -115,8 +115,10 @@
   <mu2>0.2</mu2>
   <self_collide>true</self_collide>
 
-  <!-- RGB Camera Sensor -->
+  <!-- RGB Camera Sensor (rotated 180° yaw: CAMERA_1 +X points toward robot body,
+       so we flip the sensor to look outward along -X of the link frame) -->
   <sensor name="camera_sensor" type="camera">
+    <pose>0 0 0 0 0 3.14159</pose>
     <always_on>1</always_on>
     <update_rate>30</update_rate>
     <visualize>true</visualize>
@@ -137,8 +139,9 @@
     <camera_info_topic>camera/camera_info</camera_info_topic>
   </sensor>
 
-  <!-- Depth Camera Sensor -->
+  <!-- Depth Camera Sensor (same 180° yaw flip as RGB) -->
   <sensor name="depth_sensor" type="depth_camera">
+    <pose>0 0 0 0 0 3.14159</pose>
     <always_on>1</always_on>
     <update_rate>30</update_rate>
     <ignition_frame_id>CAMERA_1</ignition_frame_id>
@@ -157,8 +160,9 @@
     <topic>depth_camera/image_raw</topic>
   </sensor>
 
-  <!-- Segmentation Camera Sensor -->
+  <!-- Segmentation Camera Sensor (same 180° yaw flip) -->
   <sensor name="segmentation_sensor" type="segmentation">
+    <pose>0 0 0 0 0 3.14159</pose>
     <always_on>1</always_on>
     <update_rate>10</update_rate>
     <camera name="jetank_segmentation">

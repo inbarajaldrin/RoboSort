@@ -20,8 +20,23 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 import xacro
 import os
+import atexit
+import subprocess
 import tempfile
 from ament_index_python.packages import get_package_share_directory
+
+
+def _kill_ign_gazebo():
+    """Kill orphan ign gazebo server/gui on exit.
+
+    These processes create their own process groups (setsid), so SIGINT
+    from the ROS2 launch system never reaches them.  Python's atexit
+    fires reliably when the interpreter shuts down after SIGINT.
+    """
+    subprocess.run(['pkill', '-f', 'ign gazebo'], capture_output=True)
+
+
+atexit.register(_kill_ign_gazebo)
 
 
 def generate_launch_description():
@@ -80,6 +95,7 @@ def generate_launch_description():
             '-topic', 'robot_description',
             '-name', 'jetank',
             '-allow_renaming', 'true',
+            '-Y', '3.14159',  # Rotate 180° so camera faces the legos (+X)
         ],
     )
 
