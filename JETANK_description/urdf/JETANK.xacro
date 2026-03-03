@@ -626,4 +626,21 @@
   <child link="camera_optical_frame"/>
 </joint>
 
+<!-- Sensor frame offset 20mm forward (-X in CAMERA_1) to clear the camera housing mesh
+     for the depth camera. The CAMERA_1 mesh extends 14.6mm in -X from the link origin,
+     so 20mm clears it with margin. -->
+<link name="CAMERA_SENSOR_FRAME">
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <mass value="0.001"/>
+    <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" iyz="0" ixz="0"/>
+  </inertial>
+</link>
+
+<joint name="camera_sensor_offset_joint" type="fixed">
+  <origin xyz="-0.02 0 0" rpy="0 0 0"/>
+  <parent link="CAMERA_1"/>
+  <child link="CAMERA_SENSOR_FRAME"/>
+</joint>
+
 </robot>

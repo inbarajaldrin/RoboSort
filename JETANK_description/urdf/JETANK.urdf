@@ -295,14 +295,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="base_link_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -315,14 +315,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="-0.070085 0.055118 0.007934"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="antenna_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="-0.070085 0.055118 0.007934"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ANTENNA_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -335,14 +335,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.046079 0.010536 -0.01116"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="bearing_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.046079 0.010536 -0.01116"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/BEARING_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -355,14 +355,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.046079 0.010553 -0.01919"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="arm_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.046079 0.010553 -0.01919"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_LOWER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -375,14 +375,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="-0.05431 0.054968 0.052234"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="wheel_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="-0.05431 0.054968 0.052234"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -395,14 +395,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.063868 -0.033862 0.052048"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="wheel_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.063868 -0.033862 0.052048"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -415,14 +415,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.104728 0.010412 -0.053571"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="camera_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.104728 0.010412 -0.053571"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/CAMERA_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -435,14 +435,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.070879 0.010535 -0.053571"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="camera_holder_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.070879 0.010535 -0.053571"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/CAM_HOLDER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -455,14 +455,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.174488 0.004873 -0.179831"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="gripper_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.174488 0.004873 -0.179831"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_L1_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -475,14 +475,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.204487 0.004763 -0.179731"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="gripper_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.204487 0.004763 -0.179731"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_L2_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -495,14 +495,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.059673 0.009093 -0.181342"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="servo_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.059673 0.009093 -0.181342"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/SERVO_UPPER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -515,14 +515,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.059673 0.008894 -0.086342"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="arm_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.059673 0.008894 -0.086342"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_MIDDLE_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -535,14 +535,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.032586 -0.009458 -0.086381"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="servo_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.032586 -0.009458 -0.086381"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/SERVO_LOWER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -555,14 +555,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="-0.054631 -0.033431 0.052049"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="wheel_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="-0.054631 -0.033431 0.052049"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -575,14 +575,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.064189 0.054537 0.052234"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="wheel_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.064189 0.054537 0.052234"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -595,14 +595,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.204524 0.014764 -0.17981"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="gripper_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.204524 0.014764 -0.17981"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_R2_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -615,14 +615,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.174524 0.014872 -0.17981"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="gripper_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.174524 0.014872 -0.17981"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_R1_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -635,14 +635,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.130006 0.010025 -0.18132"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="gripper_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.130006 0.010025 -0.18132"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/GRIPPER_BASE_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -675,14 +675,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="0.08725 0.030359 -0.188797"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="arm_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0.08725 0.030359 -0.188797"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ARM_UPPER_1.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>
@@ -695,14 +695,14 @@
     <visual>
       <origin rpy="0 0 0" xyz="-0.070406 -0.033281 0.007749"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="antenna_material"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="-0.070406 -0.033281 0.007749"/>
       <geometry>
-        <mesh filename="file:///home/aaugus11/ros2_ws/install/JETANK_description/share/JETANK_description/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="package://JETANK_description/meshes/ANTENNA_R_2.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
   </link>

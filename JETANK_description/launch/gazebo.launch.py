@@ -5,14 +5,16 @@ Launch JETANK in Ignition Gazebo Fortress with camera sensors and colored object
 Spawns the JETANK URDF into Gazebo via ros_gz_sim, bridges camera topics to ROS2.
 """
 
+import launch
 from launch import LaunchDescription
 from launch.actions import (
-    ExecuteProcess,
+    DeclareLaunchArgument,
     IncludeLaunchDescription,
     RegisterEventHandler,
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
@@ -40,6 +42,10 @@ atexit.register(_kill_ign_gazebo)
 
 
 def generate_launch_description():
+    headless_arg = DeclareLaunchArgument(
+        'headless', default_value='false',
+        description='Run Gazebo in headless mode (server only, no GUI window)')
+
     share_dir = get_package_share_directory('JETANK_description')
 
     # Process xacro to get robot URDF
@@ -64,6 +70,11 @@ def generate_launch_description():
     install_share_parent = os.path.dirname(share_dir)
 
     # --- Gazebo sim ---
+    # headless=true → '-r -s' (server only), headless=false → '-r' (with GUI)
+    headless = LaunchConfiguration('headless')
+    gz_args_gui = '-r ' + world_file
+    gz_args_headless = '-r -s ' + world_file
+
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -72,7 +83,19 @@ def generate_launch_description():
                 'gz_sim.launch.py',
             ])
         ]),
-        launch_arguments={'gz_args': '-r ' + world_file}.items(),
+        launch_arguments={'gz_args': gz_args_gui}.items(),
+        condition=launch.conditions.UnlessCondition(headless),
+    )
+    gz_sim_headless = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('ros_gz_sim'),
+                'launch',
+                'gz_sim.launch.py',
+            ])
+        ]),
+        launch_arguments={'gz_args': gz_args_headless}.items(),
+        condition=launch.conditions.IfCondition(headless),
     )
 
     # --- Robot State Publisher (publishes TF tree from URDF) ---
@@ -190,15 +213,17 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        headless_arg,
+
         # 0. Set resource path so Gazebo can find package:// meshes
-        SetEnvironmentVariable('DISPLAY', ':0'),
         SetEnvironmentVariable(
             name='IGN_GAZEBO_RESOURCE_PATH',
             value=install_share_parent + ':' +
                   os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')),
 
-        # 1. Start Gazebo with world
+        # 1. Start Gazebo with world (GUI or headless)
         gz_sim,
+        gz_sim_headless,
 
         # 2. Publish robot description
         robot_state_publisher,

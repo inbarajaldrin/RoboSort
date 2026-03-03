@@ -116,27 +116,19 @@
 
     <!--
       ============================================================
-      PHASE B: Real lego-sized bricks (dynamic, fall onto table)
-      Spawn positions (world frame, z = 0.03 to drop onto table):
-        red_lego_2x4:   (0.18, -0.08, 0.03) yaw=0.3   size=32x16x11mm  mass=6g
-        green_lego_2x3: (0.14,  0.06, 0.03) yaw=-0.5  size=24x16x11mm  mass=4.4g
-        blue_lego_2x2:  (0.22,  0.04, 0.03) yaw=0.8   size=16x16x11mm  mass=3g
-      Resting z ≈ 0.0055 (half height) after settling on table surface
+      PHASE B: Real lego-sized bricks (static, fixed at resting positions)
+      Ground truth positions (world frame):
+        red_lego_2x4:   (0.17, -0.02, 0.0055) yaw=1.0   size=32x16x11mm
+        green_lego_2x3: (0.18,  0.02, 0.0055) yaw=-0.5  size=24x16x11mm
+        blue_lego_2x2:  (0.20,  0.04, 0.0055) yaw=0.0   size=16x16x11mm
       ============================================================
     -->
 
-    <!-- Red lego 2x4: 32x16x11mm, ABS ~1050 kg/m³, mass≈0.006 kg -->
+    <!-- Red lego 2x4: 32x16x11mm -->
     <model name="red_lego_2x4">
-      <static>false</static>
-      <pose>0.18 -0.08 0.03 0 0 0.3</pose>
+      <static>true</static>
+      <pose>0.17 -0.02 0.0055 0 0 1.0</pose>
       <link name="link">
-        <inertial>
-          <mass>0.006</mass>
-          <inertia>
-            <ixx>1.89e-07</ixx><iyy>5.73e-07</iyy><izz>6.40e-07</izz>
-            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
-          </inertia>
-        </inertial>
         <collision name="collision">
           <geometry>
             <box><size>0.032 0.016 0.011</size></box>
@@ -155,18 +147,11 @@
       </link>
     </model>
 
-    <!-- Green lego 2x3: 24x16x11mm, ABS ~1050 kg/m³, mass≈0.0044 kg -->
+    <!-- Green lego 2x3: 24x16x11mm -->
     <model name="green_lego_2x3">
-      <static>false</static>
-      <pose>0.14 0.06 0.03 0 0 -0.5</pose>
+      <static>true</static>
+      <pose>0.18 0.02 0.0055 0 0 -0.5</pose>
       <link name="link">
-        <inertial>
-          <mass>0.0044</mass>
-          <inertia>
-            <ixx>1.38e-07</ixx><iyy>3.32e-07</iyy><izz>3.41e-07</izz>
-            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
-          </inertia>
-        </inertial>
         <collision name="collision">
           <geometry>
             <box><size>0.024 0.016 0.011</size></box>
@@ -185,18 +170,11 @@
       </link>
     </model>
 
-    <!-- Blue lego 2x2: 16x16x11mm, ABS ~1050 kg/m³, mass≈0.003 kg -->
+    <!-- Blue lego 2x2: 16x16x11mm -->
     <model name="blue_lego_2x2">
-      <static>false</static>
-      <pose>0.22 0.04 0.03 0 0 0.8</pose>
+      <static>true</static>
+      <pose>0.20 0.04 0.0055 0 0 0.0</pose>
       <link name="link">
-        <inertial>
-          <mass>0.003</mass>
-          <inertia>
-            <ixx>9.43e-08</ixx><iyy>9.43e-08</iyy><izz>1.28e-07</izz>
-            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
-          </inertia>
-        </inertial>
         <collision name="collision">
           <geometry>
             <box><size>0.016 0.016 0.011</size></box>

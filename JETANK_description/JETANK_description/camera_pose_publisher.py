@@ -18,7 +18,7 @@ class CameraPosePublisher(Node):
         
         # Declare parameters
         self.declare_parameter('base_frame', 'BEARING_1')
-        self.declare_parameter('camera_frame', 'CAMERA_1')
+        self.declare_parameter('camera_frame', 'CAMERA_SENSOR_FRAME')
         self.declare_parameter('publish_rate', 10.0)  # Hz
         self.declare_parameter('startup_delay', 3.0)  # seconds
         
