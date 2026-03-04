@@ -16,19 +16,19 @@ import numpy as np
 import time
 import os
 
-# Ground truth positions from lego_world.sdf (world frame)
-# Phase A: Large blocks (5cm cubes)
-GROUND_TRUTH_PHASE_A = {
-    'red': {'x': 0.20, 'y': -0.10, 'z': 0.025, 'yaw': 0.3},
-    'green': {'x': 0.15, 'y': 0.08, 'z': 0.025, 'yaw': -0.5},
-    'blue': {'x': 0.25, 'y': 0.05, 'z': 0.025, 'yaw': 0.8},
-}
-
-# Phase B: Real lego bricks
+# Ground truth positions in BEARING_1 frame (detection frame)
+# Computed from lego_world.sdf world positions via:
+#   B1 = (-world_x + 0.046, -world_y + 0.011, world_z - 0.091)
+# (Robot at world origin with 180° yaw, BEARING_1 offset (-0.046, -0.011, 0.091))
+#
+# SDF world positions:
+#   red_lego_2x4:   (0.17, -0.02, 0.0055)
+#   green_lego_2x3: (0.18,  0.02, 0.0055)
+#   blue_lego_2x2:  (0.20,  0.04, 0.0055)
 GROUND_TRUTH_PHASE_B = {
-    'red': {'x': 0.18, 'y': -0.08, 'z': 0.0055, 'yaw': 0.3},
-    'green': {'x': 0.14, 'y': 0.06, 'z': 0.0055, 'yaw': -0.5},
-    'blue': {'x': 0.22, 'y': 0.04, 'z': 0.0055, 'yaw': 0.8},
+    'red':   {'x': -0.1240, 'y':  0.0310, 'z': -0.0855},
+    'green': {'x': -0.1340, 'y': -0.0090, 'z': -0.0855},
+    'blue':  {'x': -0.1540, 'y': -0.0290, 'z': -0.0855},
 }
 
 GROUND_TRUTH = GROUND_TRUTH_PHASE_B
