@@ -11,6 +11,9 @@ Usage:
     ros2 run JETANK_description verify_detections
 """
 
+import re
+import subprocess
+
 import rclpy
 from rclpy.node import Node
 from tf2_msgs.msg import TFMessage
@@ -18,28 +21,46 @@ from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import CameraInfo, Image
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+import tf2_ros
 import time
 import os
 
-# Ground truth positions in BEARING_1 frame (detection frame)
-# Computed from lego_world.sdf world positions via:
-#   B1 = (-world_x + 0.046, -world_y + 0.011, world_z - 0.091)
-# (Robot at world origin with 180° yaw, BEARING_1 offset (-0.046, -0.011, 0.091))
-#
-# SDF world positions:
-#   red_lego_2x4:   (0.17, -0.02, 0.0055)
-#   green_lego_2x3: (0.18,  0.02, 0.0055)
-#   blue_lego_2x2:  (0.20,  0.04, 0.0055)
-GROUND_TRUTH_PHASE_B = {
-    'red':   {'x': -0.1240, 'y':  0.0310, 'z': -0.0855},
-    'green': {'x': -0.1340, 'y': -0.0090, 'z': -0.0855},
-    'blue':  {'x': -0.1540, 'y': -0.0290, 'z': -0.0855},
+# Lego model names in Gazebo -> color keys for detection matching
+LEGO_MODELS = {
+    'red_lego_2x4':   'red',
+    'green_lego_2x3': 'green',
+    'blue_lego_2x2':  'blue',
 }
+
+def query_lego_world_positions():
+    """Read actual lego positions from Gazebo's dynamic_pose topic."""
+    try:
+        result = subprocess.run(
+            ["ign", "topic", "-e", "-t",
+             "/world/lego_world/pose/info", "-n", "1"],
+            capture_output=True, text=True, timeout=10
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {}
+
+    positions = {}
+    blocks = re.split(r'(?=^pose\s*\{)', result.stdout, flags=re.MULTILINE)
+    for block in blocks:
+        for model_name, color in LEGO_MODELS.items():
+            if f'"{model_name}"' in block:
+                def _val(txt, key):
+                    m = re.search(rf'{key}:\s*([-\d.e+]+)', txt)
+                    return float(m.group(1)) if m else 0.0
+
+                pos_m = re.search(r'position\s*\{([^}]*)\}', block)
+                pb = pos_m.group(1) if pos_m else ""
+                positions[color] = np.array([
+                    _val(pb, 'x'), _val(pb, 'y'), _val(pb, 'z')])
+                break
+    return positions
 
 # Lego top surface Z (ground truth Z + half height)
 LEGO_HALF_HEIGHT = 0.0055  # 11mm / 2
-
-GROUND_TRUTH = GROUND_TRUTH_PHASE_B
 
 # opencv_to_camera quaternion from robot_config.yaml
 OPENCV_TO_CAMERA_QUAT = np.array([-0.5, -0.5, 0.5, 0.5])
@@ -132,13 +153,13 @@ class DetectionVerifier(Node):
         self.depth_image = None
         self.diagnostic_done = False
 
-        self.get_logger().info('Detection Verifier started (with Y-bias diagnostics)')
-        self.get_logger().info(f'Waiting for detections on /objects_poses...')
-        self.get_logger().info(f'Ground truth: {len(GROUND_TRUTH)} objects')
-        for name, gt in GROUND_TRUTH.items():
-            self.get_logger().info(
-                f'  {name}: ({gt["x"]:.3f}, {gt["y"]:.3f}, {gt["z"]:.3f})'
-            )
+        # TF2 for world -> BEARING_1 (handles sim drift)
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self.ground_truth = {}  # populated from TF
+
+        self.get_logger().info('Detection Verifier started (with TF-based ground truth)')
+        self.get_logger().info(f'Waiting for world->BEARING_1 TF and detections...')
 
         # Timer to print comparison every 5 seconds
         self.timer = self.create_timer(5.0, self.print_results)
@@ -170,7 +191,8 @@ class DetectionVerifier(Node):
         """Run forward-projection diagnostic once camera data is available."""
         if self.diagnostic_done:
             return
-        if self.cam_pos is None or self.cam_info is None or self.depth_image is None:
+        if (self.cam_pos is None or self.cam_info is None
+                or self.depth_image is None or not self.ground_truth):
             return
 
         self.diagnostic_done = True
@@ -205,7 +227,7 @@ class DetectionVerifier(Node):
         # Forward-project each ground truth object
         self.get_logger().info('')
         self.get_logger().info('FORWARD PROJECTION (GT → pixel):')
-        for name, gt in GROUND_TRUTH.items():
+        for name, gt in self.ground_truth.items():
             gt_center = np.array([gt['x'], gt['y'], gt['z']])
             gt_top = gt_center.copy()
             gt_top[2] += LEGO_HALF_HEIGHT  # top surface
@@ -290,13 +312,45 @@ class DetectionVerifier(Node):
     def match_detection_to_gt(self, det_name):
         """Match a detection name to a ground truth entry by color."""
         det_lower = det_name.lower()
-        for gt_name in GROUND_TRUTH:
+        for gt_name in self.ground_truth:
             if gt_name in det_lower:
                 return gt_name
         return None
 
+    def _update_ground_truth_from_tf(self):
+        """Refresh ground truth positions using live Gazebo poses + TF (handles drift + randomization)."""
+        try:
+            t = self.tf_buffer.lookup_transform(
+                "BEARING_1", "world", rclpy.time.Time())
+            p = t.transform.translation
+            q = t.transform.rotation
+            tf_pos = np.array([p.x, p.y, p.z])
+            tf_rot = R.from_quat([q.x, q.y, q.z, q.w])
+
+            # Query live lego positions from Gazebo
+            world_positions = query_lego_world_positions()
+            if not world_positions:
+                return len(self.ground_truth) > 0  # keep stale if query fails
+
+            for color, p_world in world_positions.items():
+                p_b1 = tf_rot.apply(p_world) + tf_pos
+                self.ground_truth[color] = {
+                    'x': p_b1[0], 'y': p_b1[1], 'z': p_b1[2]}
+            return True
+        except (tf2_ros.LookupException, tf2_ros.ExtrapolationException,
+                tf2_ros.ConnectivityException):
+            return False
+
     def print_results(self):
         elapsed = time.time() - self.start_time
+
+        # Refresh ground truth from TF
+        if not self._update_ground_truth_from_tf():
+            if not self.ground_truth:
+                self.get_logger().info(
+                    f'[{elapsed:.0f}s] Waiting for world->BEARING_1 TF '
+                    f'(is world_tf_publisher running?)...')
+                return
 
         if not self.detections:
             self.get_logger().info(
@@ -322,7 +376,7 @@ class DetectionVerifier(Node):
             gt_name = self.match_detection_to_gt(det_name)
 
             if gt_name is not None:
-                gt = GROUND_TRUTH[gt_name]
+                gt = self.ground_truth[gt_name]
                 gt_pos = np.array([gt['x'], gt['y'], gt['z']])
                 error_vec = det_pos - gt_pos
                 error_mm = np.linalg.norm(error_vec) * 1000
@@ -347,7 +401,7 @@ class DetectionVerifier(Node):
 
         if matched > 0:
             avg_error = total_error / matched
-            lines.append(f'\n  Matched: {matched}/{len(GROUND_TRUTH)} | '
+            lines.append(f'\n  Matched: {matched}/{len(self.ground_truth)} | '
                           f'Avg error: {avg_error:.1f}mm | '
                           f'{"PASS" if avg_error < 50 else "FAIL"} (threshold: 50mm)')
 

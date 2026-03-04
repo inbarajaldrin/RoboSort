@@ -243,6 +243,13 @@ def generate_launch_description():
                     ee_pose_publisher,
                     camera_pose_publisher,
                     camera_to_ee_pose_publisher,
+                    # World TF: publishes world → base_footprint from Gazebo model pose
+                    Node(
+                        package='JETANK_description',
+                        executable='world_tf_publisher',
+                        name='world_tf_publisher',
+                        output='screen',
+                    ),
                 ],
             )
         ),
