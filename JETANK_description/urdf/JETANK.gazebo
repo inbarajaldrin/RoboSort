@@ -13,41 +13,65 @@
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>revolute_BEARING</joint_name>
     <topic>/cmd/revolute_BEARING</topic>
+    <p_gain>20.0</p_gain>
+    <i_gain>0.5</i_gain>
+    <d_gain>2.0</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>Revolute_SERVO_LOWER</joint_name>
     <topic>/cmd/Revolute_SERVO_LOWER</topic>
+    <p_gain>15.0</p_gain>
+    <i_gain>0.3</i_gain>
+    <d_gain>1.5</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>Revolute_SERVO_UPPER</joint_name>
     <topic>/cmd/Revolute_SERVO_UPPER</topic>
+    <p_gain>10.0</p_gain>
+    <i_gain>0.2</i_gain>
+    <d_gain>1.0</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>revolute_CAMERA_HOLDER_ARM_LOWER</joint_name>
     <topic>/cmd/revolute_CAMERA_HOLDER_ARM_LOWER</topic>
+    <p_gain>5.0</p_gain>
+    <i_gain>0.1</i_gain>
+    <d_gain>0.5</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>revolute_GRIPPER_L1</joint_name>
     <topic>/cmd/revolute_GRIPPER_L1</topic>
+    <p_gain>3.0</p_gain>
+    <i_gain>0.1</i_gain>
+    <d_gain>0.3</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>revolute_GRIPPER_L2</joint_name>
     <topic>/cmd/revolute_GRIPPER_L2</topic>
+    <p_gain>3.0</p_gain>
+    <i_gain>0.1</i_gain>
+    <d_gain>0.3</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>Revolute_GRIPPER_R1</joint_name>
     <topic>/cmd/Revolute_GRIPPER_R1</topic>
+    <p_gain>3.0</p_gain>
+    <i_gain>0.1</i_gain>
+    <d_gain>0.3</d_gain>
   </plugin>
   <plugin filename="ignition-gazebo-joint-position-controller-system"
           name="ignition::gazebo::systems::JointPositionController">
     <joint_name>Revolute_GRIPPER_R2</joint_name>
     <topic>/cmd/Revolute_GRIPPER_R2</topic>
+    <p_gain>3.0</p_gain>
+    <i_gain>0.1</i_gain>
+    <d_gain>0.3</d_gain>
   </plugin>
   <!-- Free wheels: no position controller — they roll freely.
        Ground friction (mu=5.0) resists lateral sliding/yaw rotation. -->
@@ -97,15 +121,15 @@
 
 <gazebo reference="FREE_WHEEL_L_1">
   <material>${body_color}</material>
-  <mu1>5.0</mu1>
-  <mu2>5.0</mu2>
+  <mu1>0.1</mu1>
+  <mu2>0.1</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 
 <gazebo reference="FREE_WHEEL_R_1">
   <material>${body_color}</material>
-  <mu1>5.0</mu1>
-  <mu2>5.0</mu2>
+  <mu1>0.1</mu1>
+  <mu2>0.1</mu2>
   <self_collide>true</self_collide>
 </gazebo>
 

@@ -112,9 +112,9 @@
     <material name="wheel_material"/>
   </visual>
   <collision>
-    <origin xyz="-0.05431 0.054968 0.052234" rpy="0 0 0"/>
+    <origin xyz="0 -0.01353 0" rpy="1.5707963 0 0"/>
     <geometry>
-      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+      <cylinder radius="0.02486" length="0.04476"/>
     </geometry>
   </collision>
 </link>
@@ -133,9 +133,9 @@
     <material name="wheel_material"/>
   </visual>
   <collision>
-    <origin xyz="0.063868 -0.033862 0.052048" rpy="0 0 0"/>
+    <origin xyz="0 0.01353 0" rpy="1.5707963 0 0"/>
     <geometry>
-      <mesh filename="file://$(find JETANK_description)/meshes/FREE_WHEEL_R_1.stl" scale="0.001 0.001 0.001"/>
+      <cylinder radius="0.02486" length="0.04476"/>
     </geometry>
   </collision>
 </link>
@@ -301,9 +301,9 @@
     <material name="wheel_material"/>
   </visual>
   <collision>
-    <origin xyz="-0.054631 -0.033431 0.052049" rpy="0 0 0"/>
+    <origin xyz="0 0.01902 0" rpy="1.5707963 0 0"/>
     <geometry>
-      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_R_2.stl" scale="0.001 0.001 0.001"/>
+      <cylinder radius="0.02734" length="0.03903"/>
     </geometry>
   </collision>
 </link>
@@ -322,9 +322,9 @@
     <material name="wheel_material"/>
   </visual>
   <collision>
-    <origin xyz="0.064189 0.054537 0.052234" rpy="0 0 0"/>
+    <origin xyz="0 -0.01902 0" rpy="1.5707963 0 0"/>
     <geometry>
-      <mesh filename="file://$(find JETANK_description)/meshes/DRIVER_WHEEL_L_1.stl" scale="0.001 0.001 0.001"/>
+      <cylinder radius="0.02734" length="0.03903"/>
     </geometry>
   </collision>
 </link>
@@ -473,25 +473,23 @@
   <child link="ARM_LOWER_1"/>
   <axis xyz="-4e-06 -0.002097 0.999998"/>
   <limit upper="1.8" lower="-1.8" effort="2.0" velocity="6.5"/>
-
+  <dynamics damping="0.5"/>
 </joint>
 
-<joint name="revolute_FREE_WHEEL_LEFT" type="revolute">
-  <origin xyz="0.05431 -0.054968 -0.052234" rpy="0 0 0"/>
+<joint name="revolute_FREE_WHEEL_LEFT" type="continuous">
+  <origin xyz="0.054304 -0.054100 -0.053366" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="FREE_WHEEL_L_1"/>
-  <axis xyz="0.003633 0.999991 0.002097"/>
-  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
-
+  <axis xyz="0 1 0"/>
+  <dynamics damping="0.01"/>
 </joint>
 
-<joint name="revolute_FREE_WHEEL_RIGHT" type="revolute">
-  <origin xyz="-0.063868 0.033862 -0.052048" rpy="0 0 0"/>
+<joint name="revolute_FREE_WHEEL_RIGHT" type="continuous">
+  <origin xyz="-0.063847 0.033000 -0.053410" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="FREE_WHEEL_R_1"/>
-  <axis xyz="-0.003633 -0.999991 -0.002097"/>
-  <limit upper="6.283185" lower="0.0" effort="100" velocity="100"/>
-
+  <axis xyz="0 -1 0"/>
+  <dynamics damping="0.01"/>
 </joint>
 
 <joint name="rigid_CAMERA_CAMERA_HOLDER" type="fixed">
@@ -506,7 +504,7 @@
   <child link="CAM_HOLDER_1"/>
   <axis xyz="0 1 0"/>
   <limit upper="1.0" lower="-1.0" effort="2.0" velocity="6.5"/>
-
+  <dynamics damping="0.2"/>
 </joint>
 
 <joint name="revolute_GRIPPER_L1" type="revolute">
@@ -515,7 +513,7 @@
   <child link="GRIPPER_L1_1"/>
   <axis xyz="-5e-06 -0.002097 0.999998"/>
   <limit upper="0.0" lower="-1.047198" effort="1.0" velocity="6.5"/>
-
+  <dynamics damping="0.1"/>
 </joint>
 
 <joint name="revolute_GRIPPER_L2" type="revolute">
@@ -524,7 +522,7 @@
   <child link="GRIPPER_L2_1"/>
   <axis xyz="5e-06 0.002097 -0.999998"/>
   <limit upper="0.0" lower="-1.047198" effort="1.0" velocity="6.5"/>
-
+  <dynamics damping="0.1"/>
 </joint>
 
 <joint name="Revolute_SERVO_UPPER" type="revolute">
@@ -533,7 +531,7 @@
   <child link="SERVO_UPPER_1"/>
   <axis xyz="-0.003633 -0.999991 -0.002097"/>
   <limit upper="1.0" lower="-1.548620" effort="2.0" velocity="6.5"/>
-
+  <dynamics damping="0.3"/>
 </joint>
 
 <joint name="Revolute_SERVO_LOWER" type="revolute">
@@ -542,7 +540,7 @@
   <child link="ARM_MIDDLE_2"/>
   <axis xyz="-0.003633 -0.999991 -0.002097"/>
   <limit upper="1.574492" lower="-1.892348" effort="2.0" velocity="6.5"/>
-
+  <dynamics damping="0.3"/>
 </joint>
 
 <joint name="Rigid_SERVO_LOWER_ARM_LOWER" type="fixed">
@@ -552,19 +550,19 @@
 </joint>
 
 <joint name="Revolute_DRIVING_WHEEL_R" type="continuous">
-  <origin xyz="0.054631 0.033431 -0.052049" rpy="0 0 0"/>
+  <origin xyz="0.054634 0.032570 -0.050948" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="DRIVER_WHEEL_R_2"/>
-  <axis xyz="-0.003633 -0.999991 -0.002097"/>
+  <axis xyz="0 -1 0"/>
   <limit effort="100" velocity="100"/>
 
 </joint>
 
 <joint name="Revolute_DRIVING_WHEEL_L" type="continuous">
-  <origin xyz="-0.064189 -0.054537 -0.052234" rpy="0 0 0"/>
+  <origin xyz="-0.064218 -0.053670 -0.050868" rpy="0 0 0"/>
   <parent link="base_link"/>
   <child link="DRIVER_WHEEL_L_1"/>
-  <axis xyz="0.003633 0.999991 0.002097"/>
+  <axis xyz="0 1 0"/>
   <limit effort="100" velocity="100"/>
 
 </joint>
@@ -575,7 +573,7 @@
   <child link="GRIPPER_R2_1"/>
   <axis xyz="-5e-06 -0.002097 0.999998"/>
   <limit upper="0.0" lower="-1.047198" effort="1.0" velocity="6.5"/>
-
+  <dynamics damping="0.1"/>
 </joint>
 
 <joint name="Revolute_GRIPPER_R1" type="revolute">
@@ -584,6 +582,7 @@
   <child link="GRIPPER_R1_1"/>
   <axis xyz="-5e-06 -0.002097 0.999998"/>
   <limit upper="1.047198" lower="0.0" effort="1.0" velocity="6.5"/>
+  <dynamics damping="0.1"/>
 
 </joint>
 
