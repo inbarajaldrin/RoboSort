@@ -397,8 +397,11 @@ class JETANKGripperControlGUI(Node):
         self.max_gripper_retries = 3
         self.force_threshold_reached = False
         
-        # Create Tkinter GUI in a separate thread
-        self.setup_gui_thread()
+        # Create Tkinter GUI — deferred to main thread in main().
+        # On macOS, Cocoa requires tkinter on the main thread.
+        # setup_gui_thread() is kept for backwards compat but main()
+        # will call create_gui() + root.mainloop() on the main thread.
+        self.root = None
         
         # Create timer for publishing joint states (will be adjusted based on sim clock)
         # Start with 0.1s (10Hz), will adjust dynamically
@@ -3047,11 +3050,18 @@ class JETANKGripperControlGUI(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    
+
     gui = JETANKGripperControlGUI()
-    
+
+    # macOS Cocoa requires tkinter on the main thread.
+    # Spin ROS2 in a background thread, create GUI on main thread.
+    spin_thread = threading.Thread(target=rclpy.spin, args=(gui,), daemon=True)
+    spin_thread.start()
+
     try:
-        rclpy.spin(gui)
+        # Create GUI on main thread (required for macOS, safe on Linux too)
+        gui.create_gui()
+        gui.root.mainloop()
     except KeyboardInterrupt:
         pass
     finally:
