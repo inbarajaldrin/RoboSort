@@ -23,7 +23,7 @@ from std_msgs.msg import Float64
 #   WHEEL_R (axis -Y): positive velocity → forward
 #   WHEEL_L (axis +Y): positive velocity → backward (need to negate)
 
-WHEEL_SEPARATION = 0.1478  # meters (center-to-center)
+WHEEL_SEPARATION = 0.1240  # meters (center-to-center, symmetric layout)
 WHEEL_RADIUS = 0.0273      # meters
 
 

@@ -9,6 +9,8 @@ from std_msgs.msg import Float64MultiArray, Float32
 from geometry_msgs.msg import Twist
 from rosgraph_msgs.msg import Clock
 from tf2_msgs.msg import TFMessage
+from std_srvs.srv import Trigger
+import json
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -244,8 +246,8 @@ class JETANKGripperControlGUI(Node):
         self.use_real_hardware = False
         self.hardware_mode_lock = threading.Lock()
         
-        # Wheel inversion compensation: True = wheels are inverted (need to negate commands)
-        # Set to False if wheels are correctly wired
+        # Wheel inversion compensation: negate linear cmd_vel.
+        # Required for both real hardware (motor wiring) and sim (DiffDrive left/right mapping).
         self.wheels_inverted = True
 
         # Motion active flag: suppresses zero cmd_vel brake while moving
@@ -402,11 +404,42 @@ class JETANKGripperControlGUI(Node):
         # setup_gui_thread() is kept for backwards compat but main()
         # will call create_gui() + root.mainloop() on the main thread.
         self.root = None
-        
+
         # Create timer for publishing joint states (will be adjusted based on sim clock)
         # Start with 0.1s (10Hz), will adjust dynamically
         self.timer = self.create_timer(0.1, self.publish_joint_states)
-        
+
+        # --- Overridable parameters (change at runtime via ros2 param set) ---
+        # Sim defaults are slower (small robot, close-range tasks)
+        # Real hardware uses 0.5/0.5 — override via ros2 param set at runtime
+        default_linear = 0.1 if not self.use_real_hardware else 0.5
+        default_angular = 0.5
+        self.declare_parameter('drive_linear_speed', default_linear)
+        self.declare_parameter('drive_angular_speed', default_angular)
+        self.declare_parameter('drive_duration', 0.0)  # 0 = until stop_motion
+        self.declare_parameter('gripper_trajectory_duration', 1.0)
+
+        # --- Debug services (auto-register _cmd_* methods as ~/cmd_name) ---
+        self._debug_services = []
+        for name in sorted(dir(self)):
+            if name.startswith('_cmd_'):
+                srv_name = name[5:]
+                cb = self._make_trigger_callback(name)
+                srv = self.create_service(Trigger, f'~/{srv_name}', cb)
+                self._debug_services.append(srv)
+                self.get_logger().info(f'  service: ~/{srv_name}')
+
+        # Manual services (return structured data)
+        for name, cb in [
+            ('get_joint_positions', self._srv_get_joint_positions),
+            ('get_ee_pose', self._srv_get_ee_pose),
+            ('get_state', self._srv_get_state),
+            ('list_commands', self._srv_list_commands),
+        ]:
+            self._debug_services.append(
+                self.create_service(Trigger, f'~/{name}', cb))
+            self.get_logger().info(f'  service: ~/{name}')
+
         self.get_logger().info('JETANK Control GUI initialized')
     
     # ==================== Real Hardware Methods ====================
@@ -2666,12 +2699,10 @@ class JETANKGripperControlGUI(Node):
     def move_forward(self):
         """Send forward motion command via cmd_vel"""
         self.motion_active = True
-        linear = 0.5
-        if self.wheels_inverted:
-            linear = -linear
+        speed = self.get_parameter('drive_linear_speed').value
+        linear = speed if not self.wheels_inverted else -speed
         msg = Twist()
         msg.linear.x = linear
-        msg.angular.z = 0.0
         self.cmd_vel_pub.publish(msg)
         self.motion_status_text.insert(tk.END, f"Forward: linear.x={linear}\n")
         self.motion_status_text.see(tk.END)
@@ -2680,12 +2711,10 @@ class JETANKGripperControlGUI(Node):
     def move_backward(self):
         """Send backward motion command via cmd_vel"""
         self.motion_active = True
-        linear = -0.5
-        if self.wheels_inverted:
-            linear = -linear
+        speed = self.get_parameter('drive_linear_speed').value
+        linear = -speed if not self.wheels_inverted else speed
         msg = Twist()
         msg.linear.x = linear
-        msg.angular.z = 0.0
         self.cmd_vel_pub.publish(msg)
         self.motion_status_text.insert(tk.END, f"Backward: linear.x={linear}\n")
         self.motion_status_text.see(tk.END)
@@ -2694,28 +2723,22 @@ class JETANKGripperControlGUI(Node):
     def move_left(self):
         """Send left turn command via cmd_vel"""
         self.motion_active = True
-        angular = 0.5
-        if self.wheels_inverted:
-            angular = -angular
+        speed = self.get_parameter('drive_angular_speed').value
         msg = Twist()
-        msg.linear.x = 0.0
-        msg.angular.z = angular
+        msg.angular.z = speed
         self.cmd_vel_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, f"Left turn: angular.z={angular}\n")
+        self.motion_status_text.insert(tk.END, f"Left turn: angular.z={speed}\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Turning left")
 
     def move_right(self):
         """Send right turn command via cmd_vel"""
         self.motion_active = True
-        angular = -0.5
-        if self.wheels_inverted:
-            angular = -angular
+        speed = self.get_parameter('drive_angular_speed').value
         msg = Twist()
-        msg.linear.x = 0.0
-        msg.angular.z = angular
+        msg.angular.z = -speed
         self.cmd_vel_pub.publish(msg)
-        self.motion_status_text.insert(tk.END, f"Right turn: angular.z={angular}\n")
+        self.motion_status_text.insert(tk.END, f"Right turn: angular.z={-speed}\n")
         self.motion_status_text.see(tk.END)
         self.update_status("Turning right")
         
@@ -3015,6 +3038,149 @@ class JETANKGripperControlGUI(Node):
         if hasattr(self, 'status_label'):
             self.status_label.config(text=message)
         
+    # ==================================================================
+    # Debug service infrastructure
+    # ==================================================================
+
+    def _make_trigger_callback(self, method_name):
+        """Wrap a _cmd_* method as a Trigger service callback."""
+        def callback(request, response):
+            try:
+                method = getattr(self, method_name)
+                result = method()
+                response.success = True
+                response.message = str(result) if result else 'OK'
+            except Exception as e:
+                response.success = False
+                response.message = str(e)
+            return response
+        return callback
+
+    # --- Command services (auto-registered as ~/cmd_name) ---
+
+    def _cmd_move_forward(self):
+        """Drive forward at configured speed."""
+        speed = self.get_parameter('drive_linear_speed').value
+        self.motion_active = True
+        linear = speed if not self.wheels_inverted else -speed
+        msg = Twist()
+        msg.linear.x = linear
+        self.cmd_vel_pub.publish(msg)
+        return f'forward linear={linear}'
+
+    def _cmd_move_backward(self):
+        """Drive backward at configured speed."""
+        speed = self.get_parameter('drive_linear_speed').value
+        self.motion_active = True
+        linear = -speed if not self.wheels_inverted else speed
+        msg = Twist()
+        msg.linear.x = linear
+        self.cmd_vel_pub.publish(msg)
+        return f'backward linear={linear}'
+
+    def _cmd_turn_left(self):
+        """Turn left at configured angular speed."""
+        speed = self.get_parameter('drive_angular_speed').value
+        self.motion_active = True
+        msg = Twist()
+        msg.angular.z = speed
+        self.cmd_vel_pub.publish(msg)
+        return f'left angular={speed}'
+
+    def _cmd_turn_right(self):
+        """Turn right at configured angular speed."""
+        speed = self.get_parameter('drive_angular_speed').value
+        self.motion_active = True
+        msg = Twist()
+        msg.angular.z = -speed
+        self.cmd_vel_pub.publish(msg)
+        return f'right angular={-speed}'
+
+    def _cmd_stop(self):
+        """Stop all motion."""
+        self.motion_active = False
+        msg = Twist()
+        self.cmd_vel_pub.publish(msg)
+        return 'stopped'
+
+    def _cmd_gripper_open(self):
+        """Open gripper to fully open position."""
+        self.open_gripper()
+        return 'gripper opening'
+
+    def _cmd_gripper_close(self):
+        """Close gripper (force-aware if available)."""
+        self.close_gripper()
+        return 'gripper closing'
+
+    def _cmd_gripper_reset(self):
+        """Reset gripper to neutral position."""
+        self.reset_gripper()
+        return 'gripper reset'
+
+    def _cmd_camera_reset(self):
+        """Reset camera to center position."""
+        self.camera_reset()
+        return 'camera reset'
+
+    def _cmd_arm_home(self):
+        """Move arm joints to home (zero) position."""
+        self.joint_state.position[self.arm_joint_indices['BEARING']] = 0.0
+        self.joint_state.position[self.arm_joint_indices['SERVO_LOWER']] = 0.0
+        self.joint_state.position[self.arm_joint_indices['SERVO_UPPER']] = 0.0
+        return 'arm homed'
+
+    # --- Manual services (return structured data) ---
+
+    def _srv_list_commands(self, request, response):
+        """List all available service commands."""
+        cmds = sorted(n[5:] for n in dir(self) if n.startswith('_cmd_'))
+        response.success = True
+        response.message = json.dumps(cmds)
+        return response
+
+    def _srv_get_joint_positions(self, request, response):
+        """Return current joint positions as JSON."""
+        positions = dict(zip(self.joint_state.name, self.joint_state.position))
+        response.success = True
+        response.message = json.dumps(positions, indent=2)
+        return response
+
+    def _srv_get_ee_pose(self, request, response):
+        """Return end-effector pose if available."""
+        try:
+            pose = self.get_gripper_pose()
+            if pose:
+                response.success = True
+                response.message = json.dumps({
+                    'position': list(pose[0]) if pose[0] is not None else None,
+                    'orientation': list(pose[1]) if pose[1] is not None else None,
+                })
+            else:
+                response.success = False
+                response.message = 'EE pose not available'
+        except Exception as e:
+            response.success = False
+            response.message = str(e)
+        return response
+
+    def _srv_get_state(self, request, response):
+        """Return full robot state as JSON."""
+        state = {
+            'joints': dict(zip(self.joint_state.name, self.joint_state.position)),
+            'motion_active': self.motion_active,
+            'trajectory_active': self.trajectory_active,
+            'hardware_mode': 'real' if self.use_real_hardware else 'sim',
+            'wheels_inverted': self.wheels_inverted,
+            'drive_linear_speed': self.get_parameter('drive_linear_speed').value,
+            'drive_angular_speed': self.get_parameter('drive_angular_speed').value,
+        }
+        response.success = True
+        response.message = json.dumps(state, indent=2)
+        return response
+
+    # ==================================================================
+
     def publish_joint_states(self):
         """Publish current joint states synchronized with simulation clock during gripper closing"""
         if self.running:
@@ -3049,14 +3215,31 @@ class JETANKGripperControlGUI(Node):
                 self.cmd_vel_pub.publish(Twist())
 
 def main(args=None):
+    import signal
+
     rclpy.init(args=args)
 
     gui = JETANKGripperControlGUI()
 
     # macOS Cocoa requires tkinter on the main thread.
     # Spin ROS2 in a background thread, create GUI on main thread.
-    spin_thread = threading.Thread(target=rclpy.spin, args=(gui,), daemon=True)
+    executor = rclpy.executors.SingleThreadedExecutor()
+    executor.add_node(gui)
+    spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
+
+    def _shutdown(signum, frame):
+        """Orderly shutdown: stop ROS2 executor before tkinter exits."""
+        gui.running = False
+        executor.shutdown(timeout_sec=1.0)
+        if hasattr(gui, 'root') and gui.root is not None:
+            try:
+                gui.root.quit()
+            except Exception:
+                pass
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
 
     try:
         # Create GUI on main thread (required for macOS, safe on Linux too)
@@ -3066,8 +3249,9 @@ def main(args=None):
         pass
     finally:
         gui.running = False
+        executor.shutdown(timeout_sec=1.0)
         gui.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

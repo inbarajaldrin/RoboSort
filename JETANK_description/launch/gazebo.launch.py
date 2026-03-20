@@ -171,9 +171,8 @@ def generate_launch_description():
             '/cmd/Revolute_GRIPPER_R1@std_msgs/msg/Float64]gz.msgs.Double',
             '/cmd/Revolute_GRIPPER_R2@std_msgs/msg/Float64]gz.msgs.Double',
             # Free wheels: no controller — they roll freely with ground friction
-            # Drive wheels: per-wheel velocity commands ROS→Gz
-            '/cmd/Revolute_DRIVING_WHEEL_R@std_msgs/msg/Float64]gz.msgs.Double',
-            '/cmd/Revolute_DRIVING_WHEEL_L@std_msgs/msg/Float64]gz.msgs.Double',
+            # DiffDrive: cmd_vel ROS→Gz (replaces per-wheel velocity controllers)
+            '/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
         ],
         output='screen',
     )
@@ -186,13 +185,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    # --- cmd_vel to wheels: converts /cmd_vel to per-wheel velocity for Gazebo ---
-    cmd_vel_to_wheels = Node(
-        package='JETANK_description',
-        executable='cmd_vel_to_wheels',
-        name='cmd_vel_to_wheels',
-        output='screen',
-    )
+    # cmd_vel_to_wheels: no longer needed — DiffDrive plugin handles cmd_vel → wheels
 
     # --- EE pose publisher (delayed to let TF tree establish) ---
     ee_pose_publisher = TimerAction(
@@ -266,7 +259,6 @@ def generate_launch_description():
                     jetank_control_gui,
                     bridge,
                     joint_command_bridge,
-                    cmd_vel_to_wheels,
                     ee_pose_publisher,
                     camera_pose_publisher,
                     camera_to_ee_pose_publisher,
