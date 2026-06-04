@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # Reference: ~/Projects/Exploring-VLAs/vla_SO-ARM101/src/so_arm101_control/launch/gazebo.launch.py
 """
-Launch JETANK in Ignition Gazebo Fortress with camera sensors and colored objects.
+Launch JETANK in Gazebo Harmonic with camera sensors and colored objects.
 Spawns the JETANK URDF into Gazebo via ros_gz_sim, bridges camera topics to ROS2.
+
+macOS porting: server/GUI split, GZ_ env vars, gz.msgs bridge types.
 """
 
 import launch
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     RegisterEventHandler,
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -28,17 +32,17 @@ import tempfile
 from ament_index_python.packages import get_package_share_directory
 
 
-def _kill_ign_gazebo():
-    """Kill orphan ign gazebo server/gui on exit.
+def _kill_gz_sim():
+    """Kill orphan gz sim server/gui on exit.
 
     These processes create their own process groups (setsid), so SIGINT
     from the ROS2 launch system never reaches them.  Python's atexit
     fires reliably when the interpreter shuts down after SIGINT.
     """
-    subprocess.run(['pkill', '-f', 'ign gazebo'], capture_output=True)
+    subprocess.run(['pkill', '-f', 'gz sim'], capture_output=True)
 
 
-atexit.register(_kill_ign_gazebo)
+atexit.register(_kill_gz_sim)
 
 
 def generate_launch_description():
@@ -66,16 +70,35 @@ def generate_launch_description():
 
     world_file = os.path.join(share_dir, 'worlds', 'lego_world.sdf')
 
-    # IGN_GAZEBO_RESOURCE_PATH so Gazebo can find package:// meshes
+    # Resource path so Gazebo can find package:// meshes
     install_share_parent = os.path.dirname(share_dir)
 
-    # --- Gazebo sim ---
-    # headless=true → '-r -s' (server only), headless=false → '-r' (with GUI)
-    headless = LaunchConfiguration('headless')
-    gz_args_gui = '-r ' + world_file
-    gz_args_headless = '-r -s ' + world_file
+    # Also include drop_container_description meshes if available
+    try:
+        drop_share = get_package_share_directory('drop_container_description')
+        drop_share_parent = os.path.dirname(drop_share)
+    except Exception:
+        drop_share_parent = ''
 
-    gz_sim = IncludeLaunchDescription(
+    resource_path = ':'.join(filter(None, [
+        install_share_parent,
+        drop_share_parent,
+        os.environ.get('GZ_SIM_RESOURCE_PATH', ''),
+    ]))
+
+    # Plugin path so Gazebo finds system plugins in the conda env
+    conda_prefix = os.environ.get('CONDA_PREFIX', '')
+    plugin_path = ':'.join(filter(None, [
+        os.path.join(conda_prefix, 'lib') if conda_prefix else '',
+        os.environ.get('GZ_SIM_SYSTEM_PLUGIN_PATH', ''),
+    ]))
+
+    # --- Gazebo sim ---
+    # macOS: must split server (-s) and GUI (-g) into separate processes
+    headless = LaunchConfiguration('headless')
+    gz_server_args = '-r -s ' + world_file
+
+    gz_server = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
                 FindPackageShare('ros_gz_sim'),
@@ -83,19 +106,17 @@ def generate_launch_description():
                 'gz_sim.launch.py',
             ])
         ]),
-        launch_arguments={'gz_args': gz_args_gui}.items(),
-        condition=launch.conditions.UnlessCondition(headless),
+        launch_arguments={'gz_args': gz_server_args}.items(),
     )
-    gz_sim_headless = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare('ros_gz_sim'),
-                'launch',
-                'gz_sim.launch.py',
-            ])
-        ]),
-        launch_arguments={'gz_args': gz_args_headless}.items(),
-        condition=launch.conditions.IfCondition(headless),
+
+    # Separate GUI client (macOS requirement: can't combine server+GUI)
+    gz_gui = ExecuteProcess(
+        cmd=['gz', 'sim', '-g'],
+        condition=UnlessCondition(headless),
+        additional_env={
+            'GZ_SIM_RESOURCE_PATH': resource_path,
+        },
+        output='screen',
     )
 
     # --- Robot State Publisher (publishes TF tree from URDF) ---
@@ -136,23 +157,22 @@ def generate_launch_description():
         executable='parameter_bridge',
         arguments=[
             # Camera topics: Gz → ROS
-            '/camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
-            '/camera/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',
-            '/depth_camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image',
-            '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock',
+            '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/depth_camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
             # Joint command topics: ROS → Gz
-            '/cmd/revolute_BEARING@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/Revolute_SERVO_LOWER@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/Revolute_SERVO_UPPER@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/revolute_CAMERA_HOLDER_ARM_LOWER@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/revolute_GRIPPER_L1@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/revolute_GRIPPER_L2@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/Revolute_GRIPPER_R1@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/Revolute_GRIPPER_R2@std_msgs/msg/Float64]ignition.msgs.Double',
+            '/cmd/revolute_BEARING@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/Revolute_SERVO_LOWER@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/Revolute_SERVO_UPPER@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/revolute_CAMERA_HOLDER_ARM_LOWER@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/revolute_GRIPPER_L1@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/revolute_GRIPPER_L2@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/Revolute_GRIPPER_R1@std_msgs/msg/Float64]gz.msgs.Double',
+            '/cmd/Revolute_GRIPPER_R2@std_msgs/msg/Float64]gz.msgs.Double',
             # Free wheels: no controller — they roll freely with ground friction
-            # Drive wheels: per-wheel velocity commands ROS→Gz
-            '/cmd/Revolute_DRIVING_WHEEL_R@std_msgs/msg/Float64]ignition.msgs.Double',
-            '/cmd/Revolute_DRIVING_WHEEL_L@std_msgs/msg/Float64]ignition.msgs.Double',
+            # DiffDrive: cmd_vel ROS→Gz (replaces per-wheel velocity controllers)
+            '/cmd_vel@geometry_msgs/msg/Twist]gz.msgs.Twist',
         ],
         output='screen',
     )
@@ -165,13 +185,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    # --- cmd_vel to wheels: converts /cmd_vel to per-wheel velocity for Gazebo ---
-    cmd_vel_to_wheels = Node(
-        package='JETANK_description',
-        executable='cmd_vel_to_wheels',
-        name='cmd_vel_to_wheels',
-        output='screen',
-    )
+    # cmd_vel_to_wheels: no longer needed — DiffDrive plugin handles cmd_vel → wheels
 
     # --- EE pose publisher (delayed to let TF tree establish) ---
     ee_pose_publisher = TimerAction(
@@ -215,15 +229,21 @@ def generate_launch_description():
     return LaunchDescription([
         headless_arg,
 
-        # 0. Set resource path so Gazebo can find package:// meshes
+        # 0. Set resource paths so Gazebo can find package:// meshes and plugins
+        SetEnvironmentVariable(
+            name='GZ_SIM_RESOURCE_PATH',
+            value=resource_path),
         SetEnvironmentVariable(
             name='IGN_GAZEBO_RESOURCE_PATH',
-            value=install_share_parent + ':' +
-                  os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')),
+            value=resource_path),
+        SetEnvironmentVariable(
+            name='GZ_SIM_SYSTEM_PLUGIN_PATH',
+            value=plugin_path),
 
-        # 1. Start Gazebo with world (GUI or headless)
-        gz_sim,
-        gz_sim_headless,
+        # 1. Start Gazebo server (always with -s on macOS)
+        gz_server,
+        # 1b. Start Gazebo GUI separately (macOS requirement)
+        gz_gui,
 
         # 2. Publish robot description
         robot_state_publisher,
@@ -239,7 +259,6 @@ def generate_launch_description():
                     jetank_control_gui,
                     bridge,
                     joint_command_bridge,
-                    cmd_vel_to_wheels,
                     ee_pose_publisher,
                     camera_pose_publisher,
                     camera_to_ee_pose_publisher,
