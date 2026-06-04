@@ -1,0 +1,6 @@
+# colcon / ament build artifacts
+/build/
+/install/
+/log/
+__pycache__/
+*.pyc
