@@ -148,14 +148,19 @@ ros2 topic pub --once /jetank_agent_cmd std_msgs/String "{data: '0.5,0.0'}"
 The Isaac twin (in the separate `~/Documents/isaac-sim-mcp` repo — **do not edit
 that repo from here; coordinate via /send-to-agent**) builds OmniGraph action
 graphs that **subscribe to `/cmd_vel` and `/joint_commands`** from this repo,
-replacing the Gazebo bridges (`cmd_vel_to_wheels.py`, `joint_command_bridge.py`)
-which are the working *reference* for how those topics map to actuation:
+replacing the Gazebo actuation, which is the working *reference* for how those
+topics map to actuation:
 
-- **Diff-drive reference** (`cmd_vel_to_wheels.py`): `WHEEL_SEPARATION=0.1478 m`,
-  `WHEEL_RADIUS=0.0273 m`. URDF wheel names are swapped vs ROS convention —
-  `WHEEL_R` is physically LEFT (axis ≈ −Y), `WHEEL_L` is physically RIGHT
-  (axis ≈ +Y). The bridge negates `linear.x`, computes standard diff-drive, then
-  applies axis-sign corrections: `wheel_r = phys_left`, `wheel_l = −phys_right`.
+- **Diff-drive reference**: as of the `02e642f` drift fix, Gazebo drives the base
+  with the **Ignition DiffDrive plugin** (in `JETANK.gazebo`): `left_joint=Revolute_DRIVING_WHEEL_R`,
+  `right_joint=Revolute_DRIVING_WHEEL_L`, `wheel_separation=0.1240 m`,
+  `wheel_radius=0.0273 m`, `topic=/cmd_vel`, **`max_linear_acceleration=2.0`** (an
+  accel limit that tames the velocity-step pitch — see contract point 7). Both
+  drive-wheel axes are `(0 1 0)`, so forward = both wheels same sign. The custom
+  `cmd_vel_to_wheels.py` node is now **superseded** by that plugin (no longer
+  launched) but is kept, updated to the same-axis convention, as a non-DiffDrive
+  reference. URDF wheel names are swapped vs side: `WHEEL_R` is physically LEFT,
+  `WHEEL_L` is physically RIGHT.
 - **Joint reference** (`joint_command_bridge.py`): splits `/joint_commands` into
   per-joint `/cmd/<name>` Float64 for the Gazebo position controllers.
 
@@ -190,16 +195,25 @@ Things the OmniGraph reimplementation must get right (extracted from the bridges
    (`ros_gz_bridge` `std_msgs/Float64 ]ignition.msgs.Double`). They are **not** part
    of the app interface — don't recreate them in Isaac; do the split internally.
 
-4. **Wheel axes genuinely oppose (URDF-confirmed)** — this is why stock DiffDrive was
-   abandoned: `WHEEL_R` axis ≈ `(0,−1,0)` (−Y, physically LEFT), `WHEEL_L` axis ≈
-   `(0,+1,0)` (+Y, physically RIGHT). Bridge math: `linear_x = −msg.linear.x`,
-   standard diff-drive → `phys_left/right`, then publish `wheel_r = phys_left`,
-   `wheel_l = −phys_right`. **Net for pure forward the two wheel velocities come out
-   OPPOSITE in sign** (because the axes oppose). If Isaac keeps the URDF axes as-is,
-   replicate the opposite signs; if Isaac re-normalizes/flips wheel axes on import,
-   re-derive the signs from scratch. Treat **`msg.linear.x` sign as the single source
-   of truth** and use the explicit `"<lin>,<ang>"` backdoor form for unambiguous tests
-   (the GUI `wheels_inverted` negation and the bridge `linear_x` negation cancel out).
+4. **Drive-wheel axes are NORMALIZED to a common `(0 1 0)`** (URDF-confirmed, as of
+   the `02e642f` drift fix). Both
+   `Revolute_DRIVING_WHEEL_R` (at y=+0.043, physically LEFT) and
+   `Revolute_DRIVING_WHEEL_L` (at y=−0.043, physically RIGHT) now have axis
+   `(0 1 0)`, so **positive joint velocity rolls each wheel FORWARD** and **pure
+   forward drives BOTH wheels the SAME sign** (≈ +18.3 rad/s each at 0.5 m/s). The
+   diff-drive mapping is therefore negation-free: `phys_left=(v−ω·SEP/2)/R`,
+   `phys_right=(v+ω·SEP/2)/R`, publish `wheel_r=phys_left`, `wheel_l=phys_right`
+   (`SEP=0.1240 m`, `R=0.0273 m`). **An Isaac Velocity_Controller must drive both
+   wheels the same sign for forward** — if it applies opposing signs the robot spins.
+   Treat `msg.linear.x` sign as the single source of truth and use the explicit
+   `"<lin>,<ang>"` backdoor form for unambiguous tests.
+   ⚠️ **HISTORY / gotcha:** before `02e642f`, `WHEEL_R` was the *opposing* `(0,−1,0)`
+   axis, which forced the old `cmd_vel_to_wheels.py` sign gymnastics (negated
+   `linear_x` + negated `wheel_l`) and made forward come out *opposite-signed*. That
+   opposing-axis layout is what caused veer and is now gone. Any USD built from a
+   pre-`02e642f` URDF (or that snapshot's stale generated `.urdf`) will still have the
+   old opposing axes — rebuild the USD from the current `JETANK.urdf` to get the
+   `(0 1 0)(0 1 0)` convention.
 
 5. **Make drive + free wheels CONTINUOUS in Isaac.** URDF types them `revolute` with
    limit `0..6.283185`, but functionally they spin continuously — no position limit
