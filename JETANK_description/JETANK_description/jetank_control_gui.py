@@ -288,7 +288,19 @@ class JETANKGripperControlGUI(Node):
         
         # Create cmd_vel publisher (for real hardware motor driver)
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
-        
+
+        # Agent backdoor: lets an external orchestrator (e.g. the Isaac jetank-dt
+        # subscriber or a headless verifier) drive the base WITHOUT touching the
+        # Tk GUI. Publishes the same Twist on cmd_vel as the GUI's drive buttons,
+        # but the publish path here is widget-free so it works headless. Accepts
+        # a std_msgs/String: "forward"|"backward"|"left"|"right"|"stop", or an
+        # explicit "linear,angular" pair (e.g. "0.5,0.0"). No-op for the real
+        # robot path (still just a cmd_vel publish; the motor driver consumes it).
+        from std_msgs.msg import String as _AgentCmdString
+        self.agent_cmd_sub = self.create_subscription(
+            _AgentCmdString, 'jetank_agent_cmd', self._agent_cmd_callback, 10
+        )
+
         # Subscriber for real hardware joint states (from servo driver)
         # Will be created/destroyed when switching modes
         self.real_joint_state_sub = None
@@ -2660,6 +2672,43 @@ class JETANKGripperControlGUI(Node):
             self.send_gripper_command_real(0.0)
             self.send_camera_command_real(0.0)
         
+    def _agent_cmd_callback(self, msg):
+        """Headless agent backdoor: map a String command to a cmd_vel Twist.
+
+        Widget-free counterpart to the GUI drive buttons so an external
+        orchestrator can drive the base without a Tk window. Magnitudes mirror
+        the button defaults (0.5). Wheel inversion is applied identically.
+        """
+        cmd = (msg.data or '').strip().lower()
+        twist = Twist()
+        speed = 0.5
+        try:
+            if cmd in ('forward', 'fwd', 'f'):
+                twist.linear.x = -speed if self.wheels_inverted else speed
+            elif cmd in ('backward', 'back', 'b'):
+                twist.linear.x = speed if self.wheels_inverted else -speed
+            elif cmd in ('left', 'l'):
+                twist.angular.z = -speed if self.wheels_inverted else speed
+            elif cmd in ('right', 'r'):
+                twist.angular.z = speed if self.wheels_inverted else -speed
+            elif cmd in ('stop', 's', ''):
+                pass  # zero twist
+            elif ',' in cmd:
+                lin, ang = cmd.split(',', 1)
+                twist.linear.x = float(lin)
+                twist.angular.z = float(ang)
+            else:
+                self.get_logger().warn(f"agent_cmd: unknown command '{cmd}'")
+                return
+        except ValueError:
+            self.get_logger().warn(f"agent_cmd: bad linear,angular pair '{cmd}'")
+            return
+        self.motion_active = cmd not in ('stop', 's', '')
+        self.cmd_vel_pub.publish(twist)
+        self.get_logger().info(
+            f"agent_cmd '{cmd}' -> cmd_vel linear.x={twist.linear.x} angular.z={twist.angular.z}"
+        )
+
     def move_forward(self):
         """Send forward motion command via cmd_vel"""
         self.motion_active = True
