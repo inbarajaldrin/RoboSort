@@ -209,6 +209,19 @@ Things the OmniGraph reimplementation must get right (extracted from the bridges
    `revolute_BEARING` −1.5708..1.5708, camera tilt ±0.785398, per-joint gripper
    limits). **Enforce them on the Isaac articulation drives** — the app/bridges won't.
 
+7. **The control path applies an INSTANTANEOUS velocity STEP — zero acceleration /
+   slew limiting anywhere.** The backdoor/GUI publishes `/cmd_vel` as a step (0 →
+   0.5 in one message) and `cmd_vel_to_wheels.py` has **no ramp/accel/slew logic**
+   (confirmed by inspection) — it converts `/cmd_vel` straight to wheel rad/s, so the
+   drive wheels are commanded to jump `0 → ±18.3 rad/s` in a single tick. On a robot
+   with a raised CoM this hard accel impulse pitches the base forward (observed: a
+   short forward drive tipped the Isaac twin to ~59° with `ROBOT_BASE_Z=0.11`, while
+   it is rock-stable undriven). **The fix belongs on the physics/actuation side**
+   (Isaac wheel-drive max-acceleration / velocity ramp / capped joint max force,
+   and/or lower CoM), not necessarily in this repo — real motors can't step-change
+   velocity; the sim just lets them. An app-side acceleration-limited `/cmd_vel`
+   option could be added here if source-side shaping is preferred.
+
 ## Verified publish proof (re-confirmed 2026-06-04, dual-a4500, DISPLAY=:1)
 
 GUI launched headless via the recipe; node `/jetank_gripper_control_gui` came up
