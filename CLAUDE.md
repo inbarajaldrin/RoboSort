@@ -162,6 +162,53 @@ which are the working *reference* for how those topics map to actuation:
 For the same DDS reasons above, the Isaac side must join **Domain 7 + CycloneDDS +
 localhost_only=1** to see these topics.
 
+### Isaac action-graph reimplementation contract (MUST match the bridges)
+
+The Isaac twin subscribes to the **original app topics** (`/cmd_vel` Twist,
+`/joint_commands` JointState) and reimplements the bridge split **internally**.
+Things the OmniGraph reimplementation must get right (extracted from the bridges +
+`gazebo.launch.py` + URDF — these are easy to miss):
+
+1. **Two control modes in one pipeline — do NOT position-control the wheels:**
+   - Drive wheels (`Revolute_DRIVING_WHEEL_R/L`): **VELOCITY** control, units
+     **rad/s**, source = `/cmd_vel` via diff-drive.
+   - Arm/gripper (the 8 joints below): **POSITION** control, units **radians**
+     (absolute), source = `/joint_commands`.
+   - Free wheels (`revolute_FREE_WHEEL_LEFT/RIGHT`): **NO drive at all** — passive,
+     roll with ground friction. Set them free-spinning (zero stiffness/damping) in
+     Isaac or the rover binds.
+
+2. **`/joint_commands` carries 12 names but only 8 are actuated.** `joint_command_bridge.py`
+   forwards exactly these `CONTROLLED_JOINTS` (position): `revolute_BEARING`,
+   `Revolute_SERVO_LOWER`, `Revolute_SERVO_UPPER`, `revolute_CAMERA_HOLDER_ARM_LOWER`,
+   `revolute_GRIPPER_L1`, `revolute_GRIPPER_L2`, `Revolute_GRIPPER_R1`,
+   `Revolute_GRIPPER_R2`. It **skips both free wheels AND both drive wheels** (drive
+   wheels come from the `/cmd_vel` path). The position graph should consume only
+   those 8 entries from the 12-element array and ignore the wheel entries.
+
+3. **The per-joint `/cmd/<name>` Float64 topics are a Gazebo-only artifact**
+   (`ros_gz_bridge` `std_msgs/Float64 ]ignition.msgs.Double`). They are **not** part
+   of the app interface — don't recreate them in Isaac; do the split internally.
+
+4. **Wheel axes genuinely oppose (URDF-confirmed)** — this is why stock DiffDrive was
+   abandoned: `WHEEL_R` axis ≈ `(0,−1,0)` (−Y, physically LEFT), `WHEEL_L` axis ≈
+   `(0,+1,0)` (+Y, physically RIGHT). Bridge math: `linear_x = −msg.linear.x`,
+   standard diff-drive → `phys_left/right`, then publish `wheel_r = phys_left`,
+   `wheel_l = −phys_right`. **Net for pure forward the two wheel velocities come out
+   OPPOSITE in sign** (because the axes oppose). If Isaac keeps the URDF axes as-is,
+   replicate the opposite signs; if Isaac re-normalizes/flips wheel axes on import,
+   re-derive the signs from scratch. Treat **`msg.linear.x` sign as the single source
+   of truth** and use the explicit `"<lin>,<ang>"` backdoor form for unambiguous tests
+   (the GUI `wheels_inverted` negation and the bridge `linear_x` negation cancel out).
+
+5. **Make drive + free wheels CONTINUOUS in Isaac.** URDF types them `revolute` with
+   limit `0..6.283185`, but functionally they spin continuously — no position limit
+   for velocity drive.
+
+6. **Neither bridge clamps to joint limits.** Limits live only in the URDF (e.g.
+   `revolute_BEARING` −1.5708..1.5708, camera tilt ±0.785398, per-joint gripper
+   limits). **Enforce them on the Isaac articulation drives** — the app/bridges won't.
+
 ## Verified publish proof (re-confirmed 2026-06-04, dual-a4500, DISPLAY=:1)
 
 GUI launched headless via the recipe; node `/jetank_gripper_control_gui` came up
