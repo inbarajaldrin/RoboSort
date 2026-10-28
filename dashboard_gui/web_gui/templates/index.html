@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEGO Sorting System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LEGO Sorting System</h1>
+        </header>
+
+        <section class="cameras">
+            <div class="camera-container">
+                <h2>Camera 1 - Sorting View</h2>
+                <div class="camera-frame">
+                    <canvas id="camera1"></canvas>
+                    <div class="camera-status" id="status1">Initializing...</div>
+                </div>
+            </div>
+            <div class="camera-container">
+                <h2>Camera 2 - Quality Control</h2>
+                <div class="camera-frame">
+                    <canvas id="camera2"></canvas>
+                    <div class="camera-status" id="status2">Initializing...</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="data-section">
+            <div class="database-panel">
+                <h2>PostgreSQL Database - Sorting Records</h2>
+                <div class="stats-bar">
+                    <span id="stats">Total Sorted: 0 | Processing: 0 | Completed: 0</span>
+                </div>
+                <div class="table-container">
+                    <table id="database-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Timestamp</th>
+                                <th>Color</th>
+                                <th>ArUco ID</th>
+                                <th>Count</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="graph-panel">
+                <h2>Real-Time Sorting Statistics</h2>
+                <div class="chart-container">
+                    <canvas id="sortingChart"></canvas>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+
